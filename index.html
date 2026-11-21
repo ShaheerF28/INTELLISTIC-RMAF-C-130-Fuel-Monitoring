@@ -1,0 +1,2193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>INTELLISTIC RMAF — C-130 Fuel Monitoring 3D CAD & STL Exporter</title>
+
+  <!-- Tailwind CSS for sleek aerospace CAD HUD styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Inter & JetBrains Mono fonts for clean engineering typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- Three.js ES Module Import Map -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #0b0f17;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      color: #e2e8f0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .font-mono-tech {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    #viewport {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      touch-action: none;
+    }
+    /* Custom Aerospace Range Slider */
+    input[type="range"].cad-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #0ea5e9 0%, #f59e0b 100%);
+      outline: none;
+      opacity: 0.92;
+      transition: opacity 0.15s ease;
+    }
+    input[type="range"].cad-slider:hover {
+      opacity: 1;
+    }
+    input[type="range"].cad-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #f8fafc;
+      border: 2.5px solid #0284c7;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.7);
+      cursor: pointer;
+    }
+    input[type="range"].cad-slider::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #f8fafc;
+      border: 2.5px solid #0284c7;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.7);
+      cursor: pointer;
+    }
+    /* Subtle dark scrollbars for CAD inspector drawer */
+    .cad-scroll::-webkit-scrollbar {
+      width: 5px;
+    }
+    .cad-scroll::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.4);
+    }
+    .cad-scroll::-webkit-scrollbar-thumb {
+      background: rgba(100, 116, 139, 0.5);
+      border-radius: 999px;
+    }
+    /* 3D Projected Callout Pin */
+    .callout-label {
+      position: absolute;
+      transform: translate(-50%, -100%);
+      pointer-events: none;
+      z-index: 10;
+      transition: opacity 0.15s ease;
+    }
+    .callout-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      margin: 2px auto 0;
+      box-shadow: 0 0 8px currentColor;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 antialiased">
+
+  <!-- Full-Viewport Three.js CAD Canvas -->
+  <div id="viewport"></div>
+
+  <!-- Projected 3D Engineering Callout Layer -->
+  <div id="callout-layer" class="fixed inset-0 pointer-events-none z-10 overflow-hidden"></div>
+
+  <!-- Top-Left Aerospace Project Header Badge -->
+  <header class="fixed top-3 left-3 sm:top-4 sm:left-4 z-20 max-w-[calc(100vw-4.5rem)] sm:max-w-md pointer-events-auto">
+    <div class="bg-slate-900/80 backdrop-blur-md border border-slate-700/70 rounded-xl px-3.5 py-2.5 shadow-2xl">
+      <div class="flex items-center gap-2.5">
+        <div class="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_10px_#fbbf24] shrink-0"></div>
+        <h1 class="text-xs sm:text-sm font-bold tracking-wider uppercase text-slate-100 truncate">
+          INTELLISTIC RMAF <span class="text-cyan-400 font-normal mx-1">—</span> C-130 Fuel Monitoring CAD
+        </h1>
+      </div>
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 pl-5 text-[10px] sm:text-[11px] font-mono-tech text-slate-400">
+        <span>1:1 Millimeter Scale</span>
+        <span class="text-slate-600">|</span>
+        <span class="text-amber-300/90">3D-Printable Two-Part Assembly</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Mobile / Desktop Drawer Toggle Button (Top-Right) -->
+  <button
+    id="toggle-drawer-btn"
+    type="button"
+    aria-label="Toggle CAD Inspector"
+    class="fixed top-3 right-3 sm:top-4 sm:right-4 z-30 bg-slate-900/85 hover:bg-slate-800 backdrop-blur-md border border-slate-700/80 text-cyan-300 rounded-xl p-2.5 shadow-xl transition flex items-center gap-2 text-xs font-medium"
+  >
+    <svg id="drawer-icon" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+    <span class="hidden sm:inline" id="drawer-btn-label">Inspector</span>
+  </button>
+
+  <!-- Collapsible Right CAD Control & STL Export Drawer -->
+  <aside
+    id="inspector-drawer"
+    class="fixed top-16 right-3 sm:right-4 bottom-16 z-20 w-[calc(100vw-1.5rem)] max-w-[330px] bg-slate-900/85 backdrop-blur-xl border border-slate-700/75 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300 ease-out"
+  >
+    <div class="cad-scroll overflow-y-auto p-4 space-y-4 flex-1">
+
+      <!-- Exploded View Section -->
+      <section class="bg-slate-950/60 border border-slate-800/90 rounded-xl p-3.5">
+        <div class="flex items-center justify-between mb-2">
+          <label for="explode-slider" class="text-xs font-semibold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M7 11l5-5m0 0l5 5m-5-5v12" />
+            </svg>
+            Exploded View
+          </label>
+          <span id="explode-value" class="font-mono-tech text-xs font-semibold text-cyan-300 bg-cyan-950/60 border border-cyan-500/30 px-2 py-0.5 rounded-md">0%</span>
+        </div>
+        <input id="explode-slider" type="range" min="0" max="100" value="0" step="1" class="cad-slider" />
+        <div class="flex justify-between mt-1.5 text-[10px] font-mono-tech text-slate-400">
+          <button type="button" id="explode-0" class="hover:text-cyan-300 transition">Assembled</button>
+          <button type="button" id="explode-50" class="hover:text-cyan-300 transition">50% Split</button>
+          <button type="button" id="explode-100" class="hover:text-amber-300 transition">Full Explode</button>
+        </div>
+      </section>
+
+      <!-- STL Export Controls (4 Separate Printable Parts) -->
+      <section class="bg-slate-950/60 border border-slate-800/90 rounded-xl p-3.5 space-y-2.5">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            3D Print Export (.STL 1:1 mm)
+          </h2>
+          <span class="text-[9px] font-mono-tech text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-1.5 py-0.5 rounded">Z-UP</span>
+        </div>
+        <p class="text-[11px] text-slate-400 leading-snug">
+          Exports clean mechanical geometry only (electronics, O-ring &amp; overlays excluded).
+        </p>
+
+        <div class="grid grid-cols-1 gap-2 pt-0.5">
+          <!-- Part 1 -->
+          <button
+            id="btn-export-cap"
+            type="button"
+            class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-slate-800/90 hover:bg-cyan-950/80 border border-slate-700 hover:border-cyan-500/70 text-left transition group"
+          >
+            <div>
+              <div class="text-xs font-semibold text-slate-100 group-hover:text-cyan-200">Export Sensor Cap .STL</div>
+              <div class="text-[10px] font-mono-tech text-slate-400">Assy 1 · 140mm Flange + 38mm Riser</div>
+            </div>
+            <span class="text-[10px] font-mono-tech text-cyan-400 group-hover:translate-x-0.5 transition">STL ↗</span>
+          </button>
+
+          <!-- Part 2 -->
+          <button
+            id="btn-export-cap-lid"
+            type="button"
+            class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-slate-800/90 hover:bg-cyan-950/80 border border-slate-700 hover:border-cyan-500/70 text-left transition group"
+          >
+            <div>
+              <div class="text-xs font-semibold text-slate-100 group-hover:text-cyan-200">Export Cap Lid .STL</div>
+              <div class="text-[10px] font-mono-tech text-slate-400">Assy 1 · 22mm Dome + M12 Boss</div>
+            </div>
+            <span class="text-[10px] font-mono-tech text-cyan-400 group-hover:translate-x-0.5 transition">STL ↗</span>
+          </button>
+
+          <!-- Part 3 -->
+          <button
+            id="btn-export-pod"
+            type="button"
+            class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-slate-800/90 hover:bg-amber-950/60 border border-slate-700 hover:border-amber-500/70 text-left transition group"
+          >
+            <div>
+              <div class="text-xs font-semibold text-slate-100 group-hover:text-amber-200">Export Pod Body .STL</div>
+              <div class="text-[10px] font-mono-tech text-slate-400">Assy 2 · 130×95×60mm + Vent Baffle</div>
+            </div>
+            <span class="text-[10px] font-mono-tech text-amber-400 group-hover:translate-x-0.5 transition">STL ↗</span>
+          </button>
+
+          <!-- Part 4 -->
+          <button
+            id="btn-export-pod-lid"
+            type="button"
+            class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-slate-800/90 hover:bg-amber-950/60 border border-slate-700 hover:border-amber-500/70 text-left transition group"
+          >
+            <div>
+              <div class="text-xs font-semibold text-slate-100 group-hover:text-amber-200">Export Pod Solar Lid .STL</div>
+              <div class="text-[10px] font-mono-tech text-slate-400">Assy 2 · 15° Solar Pocket + SMA Boss</div>
+            </div>
+            <span class="text-[10px] font-mono-tech text-amber-400 group-hover:translate-x-0.5 transition">STL ↗</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Inspection Toggles -->
+      <section class="bg-slate-950/60 border border-slate-800/90 rounded-xl p-3.5 space-y-2">
+        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-200 mb-1">Inspection Overlays</h2>
+
+        <label class="flex items-center justify-between py-1 cursor-pointer text-xs text-slate-300 hover:text-white">
+          <span>Electronics &amp; Sensor Mockups</span>
+          <input id="toggle-electronics" type="checkbox" checked class="w-4 h-4 accent-cyan-500 rounded cursor-pointer" />
+        </label>
+
+        <label class="flex items-center justify-between py-1 cursor-pointer text-xs text-slate-300 hover:text-white">
+          <span>60° Acoustic Cone &amp; 3cm Blind Zone</span>
+          <input id="toggle-acoustic" type="checkbox" checked class="w-4 h-4 accent-cyan-500 rounded cursor-pointer" />
+        </label>
+
+        <label class="flex items-center justify-between py-1 cursor-pointer text-xs text-slate-300 hover:text-white">
+          <span>X-Ray Translucent Housings</span>
+          <input id="toggle-xray" type="checkbox" class="w-4 h-4 accent-amber-500 rounded cursor-pointer" />
+        </label>
+
+        <label class="flex items-center justify-between py-1 cursor-pointer text-xs text-slate-300 hover:text-white">
+          <span>CAD Wireframe / Edges Overlay</span>
+          <input id="toggle-wireframe" type="checkbox" class="w-4 h-4 accent-cyan-500 rounded cursor-pointer" />
+        </label>
+
+        <label class="flex items-center justify-between py-1 cursor-pointer text-xs text-slate-300 hover:text-white">
+          <span>3D Engineering Callout Labels</span>
+          <input id="toggle-labels" type="checkbox" checked class="w-4 h-4 accent-cyan-500 rounded cursor-pointer" />
+        </label>
+      </section>
+
+      <!-- Collapsible Specs & Dimensions Card -->
+      <section class="bg-slate-950/60 border border-slate-800/90 rounded-xl overflow-hidden">
+        <button
+          id="toggle-specs-btn"
+          type="button"
+          class="w-full px-3.5 py-2.5 flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-slate-200 hover:bg-slate-900/80 transition"
+        >
+          <span>Datasheet Specs &amp; Dimensions</span>
+          <svg id="specs-chevron" class="w-4 h-4 text-slate-400 transition-transform" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        <div id="specs-body" class="px-3.5 pb-3.5 pt-1 text-[11px] font-mono-tech text-slate-300 space-y-2 border-t border-slate-800/70">
+          <div>
+            <div class="text-cyan-400 font-semibold mb-0.5">ASSY 1 · Fuel Sensor Cap (X = -120)</div>
+            <ul class="space-y-0.5 text-slate-400 pl-2">
+              <li>• Flange: Ø140mm × 7mm, 12× M5 CSK @ Ø122 BCD</li>
+              <li>• O-Ring Groove: Ø104mm underside Viton seal</li>
+              <li>• Lower Neck: Ø92mm × 24mm + 2× Cam-Lock Lugs</li>
+              <li>• Riser Collar: 38mm H × Ø26mm bore (A02YY4W)</li>
+              <li>• Dead-Center IMU Bridge: MPU6050 (4× M2.5)</li>
+              <li>• Temp Probe: Ø8mm DS18B20 stainless sleeve</li>
+              <li>• Low-Profile Dome: 22mm H + Side M12 Boss</li>
+            </ul>
+          </div>
+          <div class="pt-1 border-t border-slate-800/60">
+            <div class="text-amber-400 font-semibold mb-0.5">ASSY 2 · Telemetry Pod (X = +120)</div>
+            <ul class="space-y-0.5 text-slate-400 pl-2">
+              <li>• Housing: 130 × 95 × 60mm (4mm wall, R8)</li>
+              <li>• Mounting: 4× Wing-Root Corner Flanges + Ribs</li>
+              <li>• Internal: ESP32-S3, SX1262 LoRa, LiFePO4 Tray</li>
+              <li>• Thermal Iso: BMP280 Wall + Hooded Louver</li>
+              <li>• Front UI: 27×27mm OLED, Ø5mm RGB, Buzzer</li>
+              <li>• Solar Lid: 15.0° Tilt Pocket + Upright SMA</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </aside>
+
+  <!-- Bottom-Center Quick Camera Presets Bar -->
+  <nav class="fixed bottom-3 left-1/2 -translate-x-1/2 z-20 max-w-[calc(100vw-1.5rem)]">
+    <div class="bg-slate-900/85 backdrop-blur-md border border-slate-700/75 rounded-2xl p-1.5 shadow-2xl flex items-center gap-1 overflow-x-auto">
+      <button data-cam="overview" class="cam-btn px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] font-medium whitespace-nowrap transition bg-cyan-500/20 text-cyan-200 border border-cyan-500/40">
+        Overview
+      </button>
+      <button data-cam="cap" class="cam-btn px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] font-medium whitespace-nowrap transition text-slate-300 hover:bg-slate-800 border border-transparent">
+        Sensor Cap (Left)
+      </button>
+      <button data-cam="pod" class="cam-btn px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] font-medium whitespace-nowrap transition text-slate-300 hover:bg-slate-800 border border-transparent">
+        Telemetry Pod (Right)
+      </button>
+      <button data-cam="front" class="cam-btn px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] font-medium whitespace-nowrap transition text-slate-300 hover:bg-slate-800 border border-transparent">
+        Front Technician
+      </button>
+      <button data-cam="underside" class="cam-btn px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] font-medium whitespace-nowrap transition text-slate-300 hover:bg-slate-800 border border-transparent">
+        Underside (Cam-Lock)
+      </button>
+    </div>
+  </nav>
+
+  <!-- Status Toast Notification (for STL Export confirmation / errors) -->
+  <div
+    id="toast"
+    class="fixed bottom-16 left-1/2 -translate-x-1/2 z-40 pointer-events-none opacity-0 translate-y-2 transition-all duration-300"
+  >
+    <div class="bg-slate-900/95 backdrop-blur-md border border-cyan-500/50 text-slate-100 px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-3 text-xs">
+      <span id="toast-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
+      <div>
+        <div id="toast-title" class="font-semibold text-white">STL Exported</div>
+        <div id="toast-sub" class="font-mono-tech text-[10px] text-cyan-300"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Three.js CAD Application Script -->
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { STLExporter } from 'three/addons/exporters/STLExporter.js';
+
+    // =========================================================================
+    // 1. SCENE, CAMERA, RENDERER & STUDIO LIGHTING (1 Three.js unit = 1 mm)
+    // =========================================================================
+    const container = document.getElementById('viewport');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0b1019);
+    scene.fog = new THREE.FogExp2(0x0b1019, 0.00055);
+
+    const camera = new THREE.PerspectiveCamera(
+      38,
+      window.innerWidth / window.innerHeight,
+      1,
+      4000
+    );
+    camera.position.set(15, 220, 410);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: 'high-performance'
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.minDistance = 60;
+    controls.maxDistance = 1100;
+    controls.target.set(0, 22, 0);
+
+    // Three-Point Aerospace Studio Lighting + Underside Inspection Fill
+    const hemiLight = new THREE.HemisphereLight(0xdbeafe, 0x1e293b, 0.85);
+    scene.add(hemiLight);
+
+    const keyLight = new THREE.DirectionalLight(0xfff7ed, 2.1);
+    keyLight.position.set(180, 320, 240);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.width = 2048;
+    keyLight.shadow.mapSize.height = 2048;
+    keyLight.shadow.camera.near = 50;
+    keyLight.shadow.camera.far = 1000;
+    const dShadow = 320;
+    keyLight.shadow.camera.left = -dShadow;
+    keyLight.shadow.camera.right = dShadow;
+    keyLight.shadow.camera.top = dShadow;
+    keyLight.shadow.camera.bottom = -dShadow;
+    keyLight.shadow.bias = -0.0004;
+    scene.add(keyLight);
+
+    const rimLight = new THREE.DirectionalLight(0x38bdf8, 1.15);
+    rimLight.position.set(-260, 180, -220);
+    scene.add(rimLight);
+
+    const underFillLight = new THREE.DirectionalLight(0x94a3b8, 0.8);
+    underFillLight.position.set(0, -220, 120);
+    scene.add(underFillLight);
+
+    // =========================================================================
+    // 2. ENGINEERING CAD STUDIO GRID, AXES & DATUM MARKERS
+    // =========================================================================
+    const studioGroup = new THREE.Group();
+    scene.add(studioGroup);
+
+    const GRID_Y = -68; // Positioned cleanly below lower neck & DS18B20 probe
+    const majorGrid = new THREE.GridHelper(900, 45, 0x1e3a5f, 0x162234);
+    majorGrid.position.y = GRID_Y;
+    studioGroup.add(majorGrid);
+
+    // Subtle matte studio floor plane to catch soft contact shadows
+    const floorGeo = new THREE.PlaneGeometry(1400, 1400);
+    const floorMat = new THREE.ShadowMaterial({ opacity: 0.35 });
+    const shadowFloor = new THREE.Mesh(floorGeo, floorMat);
+    shadowFloor.rotation.x = -Math.PI / 2;
+    shadowFloor.position.y = GRID_Y + 0.1;
+    shadowFloor.receiveShadow = true;
+    studioGroup.add(shadowFloor);
+
+    // Coordinate Axes Helper at Studio Origin
+    const axesHelper = new THREE.AxesHelper(60);
+    axesHelper.position.set(0, GRID_Y + 0.4, 0);
+    studioGroup.add(axesHelper);
+
+    // Subtle mounting datum reference rings at Y = 0 under each assembly
+    function createDatumRing(xCenter, radius, colorHex) {
+      const pts = [];
+      for (let i = 0; i <= 64; i++) {
+        const a = (i / 64) * Math.PI * 2;
+        pts.push(new THREE.Vector3(Math.cos(a) * radius, 0, Math.sin(a) * radius));
+      }
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineDashedMaterial({
+        color: colorHex,
+        dashSize: 4,
+        gapSize: 4,
+        transparent: true,
+        opacity: 0.35
+      });
+      const line = new THREE.Line(geo, mat);
+      line.computeLineDistances();
+      line.position.set(xCenter, 0, 0);
+      return line;
+    }
+    studioGroup.add(createDatumRing(-120, 82, 0x38bdf8));
+    studioGroup.add(createDatumRing(120, 92, 0xf59e0b));
+
+    // =========================================================================
+    // 3. SHARED CAD MATERIALS (Printable Mechanical + Visual-Only Electronics)
+    // =========================================================================
+    // Printable Part Materials (PA12-CF / Aerospace Polymer & Anodized Gunmetal)
+    const matCapBase = new THREE.MeshStandardMaterial({
+      color: 0x3c4b5e,
+      roughness: 0.42,
+      metalness: 0.35,
+      side: THREE.DoubleSide
+    });
+    const matCapLid = new THREE.MeshStandardMaterial({
+      color: 0x5c7088,
+      roughness: 0.36,
+      metalness: 0.42,
+      side: THREE.DoubleSide
+    });
+    const matPodBody = new THREE.MeshStandardMaterial({
+      color: 0x344152,
+      roughness: 0.45,
+      metalness: 0.28,
+      side: THREE.DoubleSide
+    });
+    const matPodLid = new THREE.MeshStandardMaterial({
+      color: 0x516378,
+      roughness: 0.38,
+      metalness: 0.36,
+      side: THREE.DoubleSide
+    });
+
+    const printableMaterials = [matCapBase, matCapLid, matPodBody, matPodLid];
+
+    // Visual-Only Electronics & Component Materials
+    const matVitonRed = new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.55, metalness: 0.05 });
+    const matStainless = new THREE.MeshStandardMaterial({ color: 0xdbe2ea, roughness: 0.22, metalness: 0.92 });
+    const matBrass = new THREE.MeshStandardMaterial({ color: 0xd4a24c, roughness: 0.28, metalness: 0.88 });
+    const matPcbGreen = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.5, metalness: 0.15 });
+    const matPcbBlue = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.48, metalness: 0.18 });
+    const matPcbPurple = new THREE.MeshStandardMaterial({ color: 0x6d28d9, roughness: 0.48, metalness: 0.18 });
+    const matPcbDark = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.45, metalness: 0.2 });
+    const matSilverRF = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.25, metalness: 0.88 });
+    const matBlackPlastic = new THREE.MeshStandardMaterial({ color: 0x181c24, roughness: 0.62, metalness: 0.12 });
+    const matBatteryBlue = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.38, metalness: 0.15 });
+    const matAcousticCone = new THREE.MeshBasicMaterial({
+      color: 0x22d3ee,
+      transparent: true,
+      opacity: 0.16,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+    const matBlindRing = new THREE.MeshBasicMaterial({
+      color: 0xf59e0b,
+      transparent: true,
+      opacity: 0.85,
+      side: THREE.DoubleSide
+    });
+
+    // Procedural Canvas Texture: 0.96" Dual-Color OLED Display
+    function createOledTexture() {
+      const c = document.createElement('canvas');
+      c.width = 256;
+      c.height = 256;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#04070d';
+      ctx.fillRect(0, 0, 256, 256);
+
+      // Subtle OLED glass border
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(4, 4, 248, 248);
+
+      // Top Amber Zone (Header)
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = 'bold 21px "JetBrains Mono", monospace';
+      ctx.fillText('INTELLISTIC RMAF', 18, 42);
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillRect(16, 54, 224, 2);
+
+      // Main Cyan Telemetry Zone
+      ctx.fillStyle = '#22d3ee';
+      ctx.font = 'bold 24px "JetBrains Mono", monospace';
+      ctx.fillText('C-130 FUEL:', 18, 95);
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = 'bold 34px "JetBrains Mono", monospace';
+      ctx.fillText('84.2 %', 18, 134);
+
+      // Fuel Bar Graphic
+      ctx.strokeStyle = '#22d3ee';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(165, 108, 72, 24);
+      ctx.fillStyle = '#22d3ee';
+      ctx.fillRect(169, 112, 54, 16);
+
+      ctx.fillStyle = '#67e8f9';
+      ctx.font = '18px "JetBrains Mono", monospace';
+      ctx.fillText('TEMP: 24.6 C', 18, 178);
+      ctx.fillText('LORA: -78 dBm', 18, 208);
+      ctx.fillStyle = '#34d399';
+      ctx.font = 'bold 16px "JetBrains Mono", monospace';
+      ctx.fillText('STATUS: NOMINAL', 18, 236);
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.anisotropy = 8;
+      return tex;
+    }
+
+    // Procedural Canvas Texture: Monocrystalline Mini Solar Panel
+    function createSolarPanelTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 512;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, 512, 512);
+
+      const cols = 4;
+      const rows = 5;
+      const pad = 12;
+      const gap = 8;
+      const cw = (512 - pad * 2 - gap * (cols - 1)) / cols;
+      const ch = (512 - pad * 2 - gap * (rows - 1)) / rows;
+
+      for (let r = 0; r < rows; r++) {
+        for (let col = 0; col < cols; col++) {
+          const x = pad + col * (cw + gap);
+          const y = pad + r * (ch + gap);
+
+          // Deep photovoltaic cell gradient
+          const grad = ctx.createLinearGradient(x, y, x + cw, y + ch);
+          grad.addColorStop(0, '#0a1938');
+          grad.addColorStop(0.5, '#12295c');
+          grad.addColorStop(1, '#0b1b3d');
+          ctx.fillStyle = grad;
+          ctx.fillRect(x, y, cw, ch);
+
+          // Chamfered monocrystalline cell corners (white backsheet diamonds)
+          ctx.fillStyle = '#cbd5e1';
+          const chf = 7;
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + chf, y); ctx.lineTo(x, y + chf); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(x + cw, y); ctx.lineTo(x + cw - chf, y); ctx.lineTo(x + cw, y + chf); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(x, y + ch); ctx.lineTo(x + chf, y + ch); ctx.lineTo(x, y + ch - chf); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(x + cw, y + ch); ctx.lineTo(x + cw - chf, y + ch); ctx.lineTo(x + cw, y + ch - chf); ctx.fill();
+
+          // Fine horizontal collector fingers
+          ctx.strokeStyle = 'rgba(203, 213, 225, 0.25)';
+          ctx.lineWidth = 1;
+          for (let f = 1; f < 8; f++) {
+            const fy = y + (ch * f) / 8;
+            ctx.beginPath();
+            ctx.moveTo(x + 2, fy);
+            ctx.lineTo(x + cw - 2, fy);
+            ctx.stroke();
+          }
+
+          // Vertical silver busbars
+          ctx.fillStyle = 'rgba(226, 232, 240, 0.72)';
+          ctx.fillRect(x + cw * 0.3, y, 2.5, ch);
+          ctx.fillRect(x + cw * 0.7, y, 2.5, ch);
+        }
+      }
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.anisotropy = 8;
+      return tex;
+    }
+
+    // =========================================================================
+    // 4. PROCEDURAL GEOMETRY HELPERS (Manifold-Friendly 1:1 mm)
+    // =========================================================================
+    function createRoundedRectShape(width, height, radius, cx = 0, cy = 0) {
+      const shape = new THREE.Shape();
+      const x = cx - width / 2;
+      const y = cy - height / 2;
+      const r = Math.min(radius, width / 2, height / 2);
+      shape.moveTo(x + r, y);
+      shape.lineTo(x + width - r, y);
+      shape.quadraticCurveTo(x + width, y, x + width, y + r);
+      shape.lineTo(x + width, y + height - r);
+      shape.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+      shape.lineTo(x + r, y + height);
+      shape.quadraticCurveTo(x, y + height, x, y + height - r);
+      shape.lineTo(x, y + r);
+      shape.quadraticCurveTo(x, y, x + r, y);
+      return shape;
+    }
+
+    function createRoundedRectPath(width, height, radius, cx = 0, cy = 0) {
+      const path = new THREE.Path();
+      const x = cx - width / 2;
+      const y = cy - height / 2;
+      const r = Math.min(radius, width / 2, height / 2);
+      path.moveTo(x + r, y);
+      path.lineTo(x + width - r, y);
+      path.quadraticCurveTo(x + width, y, x + width, y + r);
+      path.lineTo(x + width, y + height - r);
+      path.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+      path.lineTo(x + r, y + height);
+      path.quadraticCurveTo(x, y + height, x, y + height - r);
+      path.lineTo(x, y + r);
+      path.quadraticCurveTo(x, y, x + r, y);
+      return path;
+    }
+
+    function createCirclePath(cx, cy, r) {
+      const p = new THREE.Path();
+      p.absarc(cx, cy, r, 0, Math.PI * 2, true);
+      return p;
+    }
+
+    function createSlotPath(cx, cy, length, width) {
+      const r = width / 2;
+      const halfStraight = Math.max(0, (length - width) / 2);
+      const p = new THREE.Path();
+      p.absarc(cx - halfStraight, cy, r, Math.PI / 2, (3 * Math.PI) / 2, false);
+      p.absarc(cx + halfStraight, cy, r, -Math.PI / 2, Math.PI / 2, false);
+      p.closePath();
+      return p;
+    }
+
+    // Extrudes a 2D shape in XZ plane upward along +Y from yStart by height
+    function extrudeXZ(shape, height, yStart, mat, curveSegments = 36) {
+      const geo = new THREE.ExtrudeGeometry(shape, {
+        depth: height,
+        bevelEnabled: false,
+        curveSegments
+      });
+      // Rotate so shape X->X, shape Y->-Z, extrusion +Z->+Y
+      geo.rotateX(-Math.PI / 2);
+      geo.translate(0, yStart, 0);
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      return mesh;
+    }
+
+    // Adds a crisp CAD wireframe edge helper to track wireframe toggle
+    const edgeLinesList = [];
+    function attachCadEdges(group) {
+      group.traverse((child) => {
+        if (child.isMesh && !child.userData.noEdges) {
+          const edgesGeo = new THREE.EdgesGeometry(child.geometry, 26);
+          const edgesMat = new THREE.LineBasicMaterial({
+            color: 0x38bdf8,
+            transparent: true,
+            opacity: 0.45
+          });
+          const lineSeg = new THREE.LineSegments(edgesGeo, edgesMat);
+          lineSeg.visible = false;
+          lineSeg.userData.isCadEdge = true;
+          child.add(lineSeg);
+          edgeLinesList.push(lineSeg);
+        }
+      });
+    }
+
+    // =========================================================================
+    // 5. ASSEMBLY 1: LOW-PROFILE FUEL SENSOR CAP (Left Side, X = -120)
+    // =========================================================================
+    const assembly1Root = new THREE.Group();
+    assembly1Root.position.set(-120, 0, 0);
+    scene.add(assembly1Root);
+
+    // --- PRINTABLE PART 1: sensorCapGroup ---
+    const sensorCapGroup = new THREE.Group();
+    sensorCapGroup.name = 'SensorCapBody';
+    assembly1Root.add(sensorCapGroup);
+
+    const FLANGE_R = 70;         // 140mm OD
+    const FLANGE_BCD_R = 61;     // 122mm bolt circle diameter
+    const NECK_OUTER_R = 46;     // 92mm OD
+    const NECK_INNER_R = 41;     // 82mm ID (5mm rugged wall)
+    const ORING_R = 52;          // 104mm O-ring groove diameter
+
+    // 1A. Flush Aviation Flange (Y = 0 to Y = 7mm) with Underside O-Ring Groove & 12 Countersunk M5 Holes
+    // Layer 1 (Y = 0 to 2.5mm): Outer ring (R=53.8 to 70) + Inner ring (R=41 to 50.2) -> creates 3.6mm x 2.5mm underside O-ring groove
+    const flangeBotOuter = new THREE.Shape();
+    flangeBotOuter.absarc(0, 0, FLANGE_R, 0, Math.PI * 2, false);
+    flangeBotOuter.holes.push(createCirclePath(0, 0, ORING_R + 1.8));
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      flangeBotOuter.holes.push(createCirclePath(Math.cos(a) * FLANGE_BCD_R, Math.sin(a) * FLANGE_BCD_R, 2.75));
+    }
+    sensorCapGroup.add(extrudeXZ(flangeBotOuter, 2.5, 0, matCapBase, 64));
+
+    const flangeBotInner = new THREE.Shape();
+    flangeBotInner.absarc(0, 0, ORING_R - 1.8, 0, Math.PI * 2, false);
+    flangeBotInner.holes.push(createCirclePath(0, 0, NECK_INNER_R));
+    sensorCapGroup.add(extrudeXZ(flangeBotInner, 2.5, 0, matCapBase, 64));
+
+    // Layer 2 (Y = 2.5 to 4.5mm): Solid middle flange body above O-ring groove with 12x M5 through holes
+    const flangeMid = new THREE.Shape();
+    flangeMid.absarc(0, 0, FLANGE_R, 0, Math.PI * 2, false);
+    flangeMid.holes.push(createCirclePath(0, 0, NECK_INNER_R));
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      flangeMid.holes.push(createCirclePath(Math.cos(a) * FLANGE_BCD_R, Math.sin(a) * FLANGE_BCD_R, 2.75));
+    }
+    sensorCapGroup.add(extrudeXZ(flangeMid, 2.05, 2.48, matCapBase, 64));
+
+    // Layer 3 (Y = 4.5 to 7.0mm): Upper countersunk flange with wider Ø10.4mm CSK openings + 45° bevel sleeves
+    const flangeTop = new THREE.Shape();
+    flangeTop.absarc(0, 0, FLANGE_R, 0, Math.PI * 2, false);
+    flangeTop.holes.push(createCirclePath(0, 0, NECK_INNER_R));
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      flangeTop.holes.push(createCirclePath(Math.cos(a) * FLANGE_BCD_R, Math.sin(a) * FLANGE_BCD_R, 5.2));
+    }
+    sensorCapGroup.add(extrudeXZ(flangeTop, 2.5, 4.5, matCapBase, 64));
+
+    // 12 precision 45° Countersunk Bevel Funnels embedded into Layer 3
+    const cskPts = [
+      new THREE.Vector2(2.75, 4.48),
+      new THREE.Vector2(5.22, 4.48),
+      new THREE.Vector2(5.22, 7.0),
+      new THREE.Vector2(2.75, 4.48)
+    ];
+    const cskGeo = new THREE.LatheGeometry(cskPts, 24);
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      const cskMesh = new THREE.Mesh(cskGeo, matCapBase);
+      // Note: extrudeXZ maps shape Y -> -Z
+      cskMesh.position.set(Math.cos(a) * FLANGE_BCD_R, 0, -Math.sin(a) * FLANGE_BCD_R);
+      cskMesh.castShadow = true;
+      cskMesh.receiveShadow = true;
+      sensorCapGroup.add(cskMesh);
+    }
+
+    // Upper Lid Alignment Shoulder Step Ring (Ø100mm step to register the 106mm OD dome lid)
+    const lidRegisterRing = new THREE.Shape();
+    lidRegisterRing.absarc(0, 0, 49.8, 0, Math.PI * 2, false);
+    lidRegisterRing.holes.push(createCirclePath(0, 0, NECK_INNER_R));
+    sensorCapGroup.add(extrudeXZ(lidRegisterRing, 3.0, 6.95, matCapBase, 64));
+
+    // 4 Lid Fastener Boss Pads positioned cleanly between the 12 M5 countersinks (at 15°, 105°, 195°, 285°)
+    for (let i = 0; i < 4; i++) {
+      const a = ((15 + i * 90) * Math.PI) / 180;
+      const bx = Math.cos(a) * 53.5;
+      const bz = -Math.sin(a) * 53.5;
+      const bossShape = new THREE.Shape();
+      bossShape.absarc(0, 0, 4.2, 0, Math.PI * 2, false);
+      bossShape.holes.push(createCirclePath(0, 0, 1.65)); // M3 insert/tap hole
+      const boss = extrudeXZ(bossShape, 3.0, 6.95, matCapBase, 20);
+      boss.position.set(bx, 0, bz);
+      sensorCapGroup.add(boss);
+    }
+
+    // 1B. Cylindrical Lower Fuel-Port Neck (92mm OD, 24mm downward: Y = 0 down to Y = -24mm) with chamfered lead-in
+    const neckPts = [
+      new THREE.Vector2(NECK_INNER_R, 0.2),
+      new THREE.Vector2(NECK_OUTER_R, 0.2),
+      new THREE.Vector2(NECK_OUTER_R, -21.5),
+      new THREE.Vector2(NECK_OUTER_R - 2.0, -24.0),
+      new THREE.Vector2(NECK_INNER_R + 0.8, -24.0),
+      new THREE.Vector2(NECK_INNER_R, -22.5),
+      new THREE.Vector2(NECK_INNER_R, 0.2)
+    ];
+    const neckGeo = new THREE.LatheGeometry(neckPts, 64);
+    const neckMesh = new THREE.Mesh(neckGeo, matCapBase);
+    neckMesh.castShadow = true;
+    neckMesh.receiveShadow = true;
+    sensorCapGroup.add(neckMesh);
+
+    // 1C. Two Opposing Bayonet Cam-Lock Lugs on Lower Neck (+X and -X) with Beveled Lead-In Ramps
+    function createCamLockLug(angleRad) {
+      const lugGroup = new THREE.Group();
+      const spanAngle = 0.56; // ~32 degrees arc width
+      const rIn = NECK_OUTER_R - 1.5;
+      const rOut = NECK_OUTER_R + 9.0; // Protrudes 9mm radially outward (to R = 55mm)
+
+      const lugShape = new THREE.Shape();
+      const segs = 16;
+      for (let i = 0; i <= segs; i++) {
+        const a = -spanAngle / 2 + (i / segs) * spanAngle;
+        const x = Math.cos(a) * rOut;
+        const y = Math.sin(a) * rOut;
+        if (i === 0) lugShape.moveTo(x, y);
+        else lugShape.lineTo(x, y);
+      }
+      for (let i = segs; i >= 0; i--) {
+        const a = -spanAngle / 2 + (i / segs) * spanAngle;
+        lugShape.lineTo(Math.cos(a) * rIn, Math.sin(a) * rIn);
+      }
+      lugShape.closePath();
+
+      const lugGeo = new THREE.ExtrudeGeometry(lugShape, {
+        depth: 6.5,
+        bevelEnabled: true,
+        bevelThickness: 1.0,
+        bevelSize: 0.9,
+        bevelSegments: 2,
+        curveSegments: 20
+      });
+      lugGeo.rotateX(-Math.PI / 2);
+
+      // Subtle cam-lock helical ramp tilt along the lug face
+      const pos = lugGeo.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const z = pos.getZ(i);
+        const y = pos.getY(i);
+        // Create 1.4mm cam lead-in wedge slope on upper locking surface
+        if (y > 3.2) {
+          pos.setY(i, y + z * 0.055);
+        }
+      }
+      lugGeo.computeVertexNormals();
+
+      const lugMesh = new THREE.Mesh(lugGeo, matCapBase);
+      lugMesh.position.y = -21.0;
+      lugMesh.castShadow = true;
+      lugMesh.receiveShadow = true;
+      lugGroup.add(lugMesh);
+      lugGroup.rotation.y = angleRad;
+      return lugGroup;
+    }
+    sensorCapGroup.add(createCamLockLug(0));
+    sensorCapGroup.add(createCamLockLug(Math.PI));
+
+    // 1D. Central 38mm Vertical Acoustic Riser Collar (A02YY4W Ultrasonic Mount)
+    // Extends from Y = -24mm (flush with lower neck) to Y = +14mm -> exact 38mm tall!
+    // Clear 26mm inner bore (R = 13mm), 32mm OD (R = 16mm), top sensor pocket rim & bottom acoustic flare
+    const riserPts = [
+      new THREE.Vector2(13.0, 14.0),
+      new THREE.Vector2(16.2, 14.0),
+      new THREE.Vector2(16.2, -24.0),
+      new THREE.Vector2(14.6, -24.0),
+      new THREE.Vector2(13.0, -20.5), // Smooth acoustic exit bevel
+      new THREE.Vector2(13.0, 10.5),
+      new THREE.Vector2(11.6, 10.5),  // Internal seating ledge for A02YY4W head
+      new THREE.Vector2(11.6, 12.2),
+      new THREE.Vector2(13.0, 12.2),
+      new THREE.Vector2(13.0, 14.0)
+    ];
+    const riserMesh = new THREE.Mesh(new THREE.LatheGeometry(riserPts, 48), matCapBase);
+    riserMesh.castShadow = true;
+    riserMesh.receiveShadow = true;
+    sensorCapGroup.add(riserMesh);
+
+    // 4 Structural Radial Spider Webs anchoring the 38mm Riser Collar rigidly to the Lower Neck Wall
+    for (let i = 0; i < 4; i++) {
+      const a = (i * Math.PI) / 2 + Math.PI / 4; // 45°, 135°, 225°, 315°
+      const ribGeo = new THREE.BoxGeometry(27.0, 14.0, 3.2);
+      const ribMesh = new THREE.Mesh(ribGeo, matCapBase);
+      const rMid = (15.5 + NECK_INNER_R) / 2;
+      ribMesh.position.set(Math.cos(a) * rMid, -8.0, Math.sin(a) * rMid);
+      ribMesh.rotation.y = -a;
+      ribMesh.castShadow = true;
+      ribMesh.receiveShadow = true;
+      sensorCapGroup.add(ribMesh);
+    }
+
+    // 1E. Dead-Center Internal Mounting Pad / Bridge Deck for MPU6050 IMU (at X = 0, Z = 0)
+    // Spans cleanly across the cap interior above the 38mm riser (open on ±Z for A02YY4W side loading)
+    const bridgeDeckGroup = new THREE.Group();
+    // Two vertical bridge stanchions rising from inner neck wall at X = ±37mm
+    [-37, 37].forEach((sx) => {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(6.5, 22, 16), matCapBase);
+      post.position.set(sx, 8.5, 0);
+      post.castShadow = true;
+      post.receiveShadow = true;
+      bridgeDeckGroup.add(post);
+    });
+    // Central Horizontal Bridge Span & Dead-Center IMU Pad (Y = +17.5 to +20.0mm)
+    const bridgeSpan = new THREE.Mesh(new THREE.BoxGeometry(80, 2.6, 16), matCapBase);
+    bridgeSpan.position.set(0, 18.8, 0);
+    bridgeSpan.castShadow = true;
+    bridgeSpan.receiveShadow = true;
+    bridgeDeckGroup.add(bridgeSpan);
+
+    // Raised Dead-Center MPU6050 Pad (24mm x 18mm centered at X=0, Z=0)
+    const imuPad = new THREE.Mesh(new THREE.BoxGeometry(24, 1.4, 18), matCapBase);
+    imuPad.position.set(0, 20.4, 0);
+    imuPad.castShadow = true;
+    imuPad.receiveShadow = true;
+    bridgeDeckGroup.add(imuPad);
+
+    // 4× M2.5 Standoff Bosses directly on the dead-center MPU6050 pad
+    const imuStandoffOffsets = [
+      [-8.5, -6.0], [8.5, -6.0], [-8.5, 6.0], [8.5, 6.0]
+    ];
+    imuStandoffOffsets.forEach(([ox, oz]) => {
+      const sShape = new THREE.Shape();
+      sShape.absarc(0, 0, 2.2, 0, Math.PI * 2, false);
+      sShape.holes.push(createCirclePath(0, 0, 1.15));
+      const boss = extrudeXZ(sShape, 2.4, 20.8, matCapBase, 16);
+      boss.position.set(ox, 0, oz);
+      bridgeDeckGroup.add(boss);
+    });
+    sensorCapGroup.add(bridgeDeckGroup);
+
+    // 1F. Adjacent Extended Pass-Through Boss & Vertical Probe Tube Channel (8mm bore) for DS18B20
+    const PROBE_X = 25;
+    const PROBE_Z = 18;
+    const probeBossShape = new THREE.Shape();
+    probeBossShape.absarc(0, 0, 6.5, 0, Math.PI * 2, false);
+    probeBossShape.holes.push(createCirclePath(0, 0, 4.0)); // Exact 8mm clear bore
+    // Extends from Y = -36mm (12mm below lower neck as protective sleeve) up to Y = +11mm
+    const probeBoss = extrudeXZ(probeBossShape, 47.0, -36.0, matCapBase, 28);
+    probeBoss.position.set(PROBE_X, 0, PROBE_Z);
+    sensorCapGroup.add(probeBoss);
+
+    // Structural tie web connecting DS18B20 tube boss solidly to the inner neck wall
+    const probeTie = new THREE.Mesh(new THREE.BoxGeometry(14, 24, 5), matCapBase);
+    probeTie.position.set(PROBE_X + 7, -11, PROBE_Z + 5);
+    probeTie.rotation.y = -Math.atan2(PROBE_Z, PROBE_X);
+    probeTie.castShadow = true;
+    probeTie.receiveShadow = true;
+    sensorCapGroup.add(probeTie);
+
+    attachCadEdges(sensorCapGroup);
+
+    // --- PRINTABLE PART 2: capLidGroup (22mm Low-Profile Dome + Side-Exit M12 Boss) ---
+    const capLidGroup = new THREE.Group();
+    capLidGroup.name = 'SensorCapLid';
+    assembly1Root.add(capLidGroup);
+
+    // Low-Profile Aerodynamic Beveled Dome Shell (Y = +7mm to Y = +29mm -> exact 22mm total height!)
+    // Hollow interior with 3mm wall thickness + bottom alignment lip
+    const domePts = [
+      // Outer profile (bottom up to top center)
+      new THREE.Vector2(49.8, 7.0),
+      new THREE.Vector2(53.0, 7.0),   // 106mm OD base
+      new THREE.Vector2(53.0, 17.5),  // Vertical side wall for M12 exit
+      new THREE.Vector2(49.5, 22.8),  // Smooth aerodynamic bevel
+      new THREE.Vector2(38.0, 29.0),  // 22mm height crown (7 + 22 = 29mm)
+      new THREE.Vector2(0.0, 29.0),
+      // Inner hollow profile (3mm wall thickness)
+      new THREE.Vector2(0.0, 26.0),
+      new THREE.Vector2(37.0, 26.0),
+      new THREE.Vector2(47.2, 20.5),
+      new THREE.Vector2(50.0, 16.5),
+      new THREE.Vector2(50.0, 10.0),  // Stepped over flange register ring
+      new THREE.Vector2(49.8, 7.0)
+    ];
+    const domeMesh = new THREE.Mesh(new THREE.LatheGeometry(domePts, 64), matCapLid);
+    domeMesh.castShadow = true;
+    domeMesh.receiveShadow = true;
+    capLidGroup.add(domeMesh);
+
+    // 4 Perimeter Fastener Ears matching the flange screw bosses (15°, 105°, 195°, 285°)
+    for (let i = 0; i < 4; i++) {
+      const a = ((15 + i * 90) * Math.PI) / 180;
+      const tabShape = new THREE.Shape();
+      tabShape.absarc(0, 0, 4.2, 0, Math.PI * 2, false);
+      tabShape.holes.push(createCirclePath(0, 0, 1.7)); // M3 clearance
+      const tab = extrudeXZ(tabShape, 4.5, 10.0, matCapLid, 20);
+      tab.position.set(Math.cos(a) * 53.5, 0, -Math.sin(a) * 53.5);
+      capLidGroup.add(tab);
+    }
+
+    // Side-Exit M12 Waterproof Circular Cable Gland Boss (exiting along +X at Y = 14.5mm)
+    const m12CapBossGroup = new THREE.Group();
+    m12CapBossGroup.position.set(50.0, 14.5, 0);
+    m12CapBossGroup.rotation.z = -Math.PI / 2; // Lathe Y-axis points along +X
+
+    // Transition shoulder + hex wrench flats + externally threaded M12 barrel (hollow bore Ø7.5mm)
+    const m12Pts = [
+      new THREE.Vector2(3.75, -1.5),
+      new THREE.Vector2(9.2, -1.5),
+      new THREE.Vector2(9.2, 5.5),
+      new THREE.Vector2(6.0, 5.5),  // M12 OD = 12mm (R=6.0)
+      new THREE.Vector2(6.0, 7.0),
+      new THREE.Vector2(5.45, 7.5),
+      new THREE.Vector2(6.0, 8.0),
+      new THREE.Vector2(5.45, 8.5),
+      new THREE.Vector2(6.0, 9.0),
+      new THREE.Vector2(5.45, 9.5),
+      new THREE.Vector2(6.0, 10.0),
+      new THREE.Vector2(5.45, 10.5),
+      new THREE.Vector2(6.0, 11.0),
+      new THREE.Vector2(5.45, 11.5),
+      new THREE.Vector2(6.0, 12.0),
+      new THREE.Vector2(5.5, 13.5),
+      new THREE.Vector2(3.75, 13.5),
+      new THREE.Vector2(3.75, -1.5)
+    ];
+    const m12Barrel = new THREE.Mesh(new THREE.LatheGeometry(m12Pts, 32), matCapLid);
+    m12Barrel.castShadow = true;
+    m12Barrel.receiveShadow = true;
+    m12CapBossGroup.add(m12Barrel);
+
+    // Hexagonal Wrench Flats (18mm across flats) around the M12 boss base
+    const hexShape = new THREE.Shape();
+    const hexR = 9.8;
+    for (let i = 0; i < 6; i++) {
+      const a = (i * Math.PI) / 3;
+      const hx = Math.cos(a) * hexR;
+      const hy = Math.sin(a) * hexR;
+      if (i === 0) hexShape.moveTo(hx, hy);
+      else hexShape.lineTo(hx, hy);
+    }
+    hexShape.closePath();
+    hexShape.holes.push(createCirclePath(0, 0, 5.8));
+    const hexMesh = extrudeXZ(hexShape, 5.2, 1.5, matCapLid, 6);
+    m12CapBossGroup.add(hexMesh);
+
+    capLidGroup.add(m12CapBossGroup);
+    attachCadEdges(capLidGroup);
+
+    // --- VISUAL-ONLY GROUPS FOR ASSEMBLY 1 (Excluded from STL Export) ---
+    // 1V-A: Red Viton O-Ring seated inside underside Ø104mm groove
+    const capOringVisual = new THREE.Group();
+    const oRingMesh = new THREE.Mesh(new THREE.TorusGeometry(ORING_R, 1.65, 18, 64), matVitonRed);
+    oRingMesh.rotation.x = Math.PI / 2;
+    oRingMesh.position.y = 0.85;
+    capOringVisual.add(oRingMesh);
+    assembly1Root.add(capOringVisual);
+
+    // 1V-B: Internal Sensor Mockups (A02YY4W Ultrasonic + MPU6050 IMU + DS18B20 Stainless Probe)
+    const capElectronicsGroup = new THREE.Group();
+    assembly1Root.add(capElectronicsGroup);
+
+    // A02YY4W IP67 Ultrasonic Transducer seated at top of 38mm riser (Y = +10.5 to +16.5mm)
+    const a02Group = new THREE.Group();
+    const a02Housing = new THREE.Mesh(new THREE.CylinderGeometry(11.4, 11.4, 6.2, 32), matBlackPlastic);
+    a02Housing.position.y = 13.6;
+    a02Group.add(a02Housing);
+    // Silver piezoelectric transducer face pointing straight down
+    const a02Face = new THREE.Mesh(new THREE.CylinderGeometry(9.2, 9.2, 1.2, 32), matStainless);
+    a02Face.position.y = 10.6;
+    a02Group.add(a02Face);
+    // Potted cable tail exiting rear side
+    const a02Tail = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.0, 8, 12), matBlackPlastic);
+    a02Tail.rotation.x = Math.PI / 2;
+    a02Tail.position.set(0, 14.5, -13);
+    a02Group.add(a02Tail);
+    capElectronicsGroup.add(a02Group);
+
+    // MPU6050 IMU Breakout PCB mounted on the Dead-Center Bridge Pad (Y = +23.2mm)
+    const mpuGroup = new THREE.Group();
+    mpuGroup.position.set(0, 23.6, 0);
+    const mpuPcb = new THREE.Mesh(new THREE.BoxGeometry(21, 1.6, 15.5), matPcbBlue);
+    mpuGroup.add(mpuPcb);
+    const mpuChip = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.9, 4.2), matBlackPlastic);
+    mpuChip.position.set(0, 1.15, 0);
+    mpuGroup.add(mpuChip);
+    // Gold header pins along edge
+    for (let i = 0; i < 8; i++) {
+      const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 2.4, 8), matBrass);
+      pin.position.set(-7.5 + i * 2.15, 1.0, -5.8);
+      mpuGroup.add(pin);
+    }
+    capElectronicsGroup.add(mpuGroup);
+
+    // DS18B20 Stainless Steel Temperature Probe extending downward through Ø8mm channel
+    const dsGroup = new THREE.Group();
+    dsGroup.position.set(PROBE_X, 0, PROBE_Z);
+    // Stainless steel waterproof probe capsule (Ø6mm × 50mm long, protruding below sleeve)
+    const dsProbeRod = new THREE.Mesh(new THREE.CylinderGeometry(3.0, 3.0, 56, 20), matStainless);
+    dsProbeRod.position.y = -24;
+    dsGroup.add(dsProbeRod);
+    const dsTip = new THREE.Mesh(new THREE.SphereGeometry(3.0, 16, 12), matStainless);
+    dsTip.position.y = -52;
+    dsGroup.add(dsTip);
+    // Black heat-shrink strain relief & lead wire rising into dome
+    const dsCollar = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.4, 14, 16), matBlackPlastic);
+    dsCollar.position.y = 10;
+    dsGroup.add(dsCollar);
+    capElectronicsGroup.add(dsGroup);
+
+    // 1V-C: Toggleable 60-Degree Downward Acoustic Cone & 3cm (30mm) Blind-Zone Marker
+    const acousticOverlayGroup = new THREE.Group();
+    assembly1Root.add(acousticOverlayGroup);
+
+    const CONE_LEN = 76; // Extends from acoustic face (Y = +10.5mm) down to Y = -65.5mm
+    const CONE_TOP_R = 8.0;
+    const CONE_BOT_R = CONE_TOP_R + CONE_LEN * Math.tan((30 * Math.PI) / 180); // 60° full angle = 30° half-angle
+    const coneGeo = new THREE.CylinderGeometry(CONE_TOP_R, CONE_BOT_R, CONE_LEN, 48, 1, true);
+    const coneMesh = new THREE.Mesh(coneGeo, matAcousticCone);
+    coneMesh.position.y = 10.5 - CONE_LEN / 2;
+    acousticOverlayGroup.add(coneMesh);
+
+    // Subtle wireframe outline rays on the 60° acoustic cone
+    const coneWire = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.CylinderGeometry(CONE_TOP_R, CONE_BOT_R, CONE_LEN, 12, 1, true), 20),
+      new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.45 })
+    );
+    coneWire.position.y = 10.5 - CONE_LEN / 2;
+    acousticOverlayGroup.add(coneWire);
+
+    // 30mm (3cm) Blind-Zone Boundary Marker Ring at Y = 10.5 - 30 = -19.5mm (safely inside 38mm collar!)
+    const blindR = CONE_TOP_R + 30 * Math.tan((30 * Math.PI) / 180);
+    const blindRing = new THREE.Mesh(new THREE.TorusGeometry(13.2, 0.65, 12, 48), matBlindRing);
+    blindRing.rotation.x = Math.PI / 2;
+    blindRing.position.y = -19.5;
+    acousticOverlayGroup.add(blindRing);
+
+    // Outer translucent amber indicator ring showing exact 30mm blind-zone plane
+    const blindHalo = new THREE.Mesh(new THREE.RingGeometry(blindR - 1.2, blindR, 48), matBlindRing);
+    blindHalo.rotation.x = -Math.PI / 2;
+    blindHalo.position.y = -19.5;
+    acousticOverlayGroup.add(blindHalo);
+
+    // =========================================================================
+    // 6. ASSEMBLY 2: SIDE-MOUNTED TELEMETRY & POWER POD (Right Side, X = +120)
+    // =========================================================================
+    const assembly2Root = new THREE.Group();
+    assembly2Root.position.set(120, 0, 0);
+    scene.add(assembly2Root);
+
+    // --- PRINTABLE PART 3: podBodyGroup (130mm x 95mm x 60mm Weatherproof Housing) ---
+    const podBodyGroup = new THREE.Group();
+    podBodyGroup.name = 'TelemetryPodBody';
+    assembly2Root.add(podBodyGroup);
+
+    const POD_W = 130;     // X: -65 to +65
+    const POD_D = 95;      // Z: -47.5 to +47.5
+    const POD_H = 60;      // Y: 0 to +60
+    const POD_WALL = 4.0;
+    const POD_R = 8.0;
+
+    // 3A. Floor Plate (Y = 0 to 4mm) with Bottom M12 Cable Entry Bore at (X = -44, Z = +16)
+    const M12_POD_X = -44;
+    const M12_POD_Z = 16;
+    const floorShape = createRoundedRectShape(POD_W, POD_D, POD_R);
+    // Remember extrudeXZ maps shape Y -> -Z
+    floorShape.holes.push(createCirclePath(M12_POD_X, -M12_POD_Z, 6.2));
+    podBodyGroup.add(extrudeXZ(floorShape, POD_WALL, 0, matPodBody, 32));
+
+    // 3B. Lower Continuous Perimeter Wall Skirt (Y = 4 to 14mm) — solid weatherproof base band
+    const lowerWallShape = createRoundedRectShape(POD_W, POD_D, POD_R);
+    lowerWallShape.holes.push(createRoundedRectPath(POD_W - POD_WALL * 2, POD_D - POD_WALL * 2, POD_R - 2.5));
+    podBodyGroup.add(extrudeXZ(lowerWallShape, 10.0, POD_WALL, matPodBody, 32));
+
+    // Upper Perimeter Band (Y = 50 to 58mm) + Top Gasket Groove Lip (Y = 58 to 60mm)
+    podBodyGroup.add(extrudeXZ(lowerWallShape, 8.0, 50.0, matPodBody, 32));
+
+    // Top Perimeter Gasket Groove (Y = 58 to 60mm): outer 1.4mm lip + inner 1.4mm lip -> 1.2mm recessed gasket channel
+    const outerLipShape = createRoundedRectShape(POD_W, POD_D, POD_R);
+    outerLipShape.holes.push(createRoundedRectPath(POD_W - 2.8, POD_D - 2.8, POD_R - 1.2));
+    podBodyGroup.add(extrudeXZ(outerLipShape, 2.0, 58.0, matPodBody, 32));
+
+    const innerLipShape = createRoundedRectShape(POD_W - 5.2, POD_D - 5.2, POD_R - 2.0);
+    innerLipShape.holes.push(createRoundedRectPath(POD_W - POD_WALL * 2, POD_D - POD_WALL * 2, POD_R - 2.5));
+    podBodyGroup.add(extrudeXZ(innerLipShape, 2.0, 58.0, matPodBody, 32));
+
+    // 3C. Mid-Height Walls (Y = 14 to 50mm) built per face so Front Wall & Right Wall have REAL cutouts!
+    const MID_H = 36.0; // Y = 14 to 50
+    const MID_Y = 14.0;
+
+    // 4 Rounded Outer Corner Vertical Segments (spanning Y = 14 to 50)
+    const cornerArcAngles = [
+      { cx: POD_W / 2 - POD_R, cz: POD_D / 2 - POD_R, a0: 0, a1: Math.PI / 2 },
+      { cx: -(POD_W / 2 - POD_R), cz: POD_D / 2 - POD_R, a0: Math.PI / 2, a1: Math.PI },
+      { cx: -(POD_W / 2 - POD_R), cz: -(POD_D / 2 - POD_R), a0: Math.PI, a1: (3 * Math.PI) / 2 },
+      { cx: POD_W / 2 - POD_R, cz: -(POD_D / 2 - POD_R), a0: (3 * Math.PI) / 2, a1: Math.PI * 2 }
+    ];
+    cornerArcAngles.forEach(({ cx, cz, a0, a1 }) => {
+      const cShape = new THREE.Shape();
+      const segs = 12;
+      for (let i = 0; i <= segs; i++) {
+        const a = a0 + (i / segs) * (a1 - a0);
+        const px = cx + Math.cos(a) * POD_R;
+        const py = -(cz + Math.sin(a) * POD_R);
+        if (i === 0) cShape.moveTo(px, py);
+        else cShape.lineTo(px, py);
+      }
+      for (let i = segs; i >= 0; i--) {
+        const a = a0 + (i / segs) * (a1 - a0);
+        const px = cx + Math.cos(a) * (POD_R - POD_WALL);
+        const py = -(cz + Math.sin(a) * (POD_R - POD_WALL));
+        cShape.lineTo(px, py);
+      }
+      cShape.closePath();
+      podBodyGroup.add(extrudeXZ(cShape, MID_H + 0.2, MID_Y - 0.1, matPodBody, 16));
+    });
+
+    // Back Wall (-Z face, solid)
+    const backWall = new THREE.Mesh(
+      new THREE.BoxGeometry(POD_W - POD_R * 2 + 0.4, MID_H + 0.2, POD_WALL),
+      matPodBody
+    );
+    backWall.position.set(0, MID_Y + MID_H / 2, -(POD_D / 2 - POD_WALL / 2));
+    backWall.castShadow = true;
+    backWall.receiveShadow = true;
+    podBodyGroup.add(backWall);
+
+    // Left Wall (-X face, solid)
+    const leftWall = new THREE.Mesh(
+      new THREE.BoxGeometry(POD_WALL, MID_H + 0.2, POD_D - POD_R * 2 + 0.4),
+      matPodBody
+    );
+    leftWall.position.set(-(POD_W / 2 - POD_WALL / 2), MID_Y + MID_H / 2, 0);
+    leftWall.castShadow = true;
+    leftWall.receiveShadow = true;
+    podBodyGroup.add(leftWall);
+
+    // Technician-Facing Front Wall (+Z face, X: -57 to +57, Y: 14 to 50) with PRECISION CUTOUTS!
+    // Extruded in XY plane along +Z from Z = 43.5 to 47.5
+    const fwW = POD_W - POD_R * 2 + 0.4;
+    const frontShape = new THREE.Shape();
+    frontShape.moveTo(-fwW / 2, MID_Y - 0.1);
+    frontShape.lineTo(fwW / 2, MID_Y - 0.1);
+    frontShape.lineTo(fwW / 2, MID_Y + MID_H + 0.1);
+    frontShape.lineTo(-fwW / 2, MID_Y + MID_H + 0.1);
+    frontShape.closePath();
+
+    // 1) Precision 27mm x 27mm OLED Display Cutout at (X = -22, Y = 32)
+    const OLED_X = -22;
+    const OLED_Y = 32;
+    frontShape.holes.push(createRoundedRectPath(27.0, 27.0, 1.2, OLED_X, OLED_Y));
+
+    // 2) 5mm RGB Status LED Aperture at (X = +12, Y = 35)
+    const LED_X = 12;
+    const LED_Y = 35;
+    frontShape.holes.push(createCirclePath(LED_X, LED_Y, 2.5));
+
+    // 3) Three Horizontal Acoustic Buzzer Slots at (X = +36, Y = 38, 32, 26)
+    const BUZ_X = 36;
+    [38, 32, 26].forEach((sy) => {
+      frontShape.holes.push(createSlotPath(BUZ_X, sy, 18.0, 2.4));
+    });
+
+    const frontWallGeo = new THREE.ExtrudeGeometry(frontShape, {
+      depth: POD_WALL,
+      bevelEnabled: false,
+      curveSegments: 24
+    });
+    const frontWallMesh = new THREE.Mesh(frontWallGeo, matPodBody);
+    frontWallMesh.position.z = POD_D / 2 - POD_WALL;
+    frontWallMesh.castShadow = true;
+    frontWallMesh.receiveShadow = true;
+    podBodyGroup.add(frontWallMesh);
+
+    // Outward-Facing Recessed OLED Bezel Frame on +Z Wall
+    const oledBezelShape = createRoundedRectShape(34.0, 34.0, 3.0, OLED_X, OLED_Y);
+    oledBezelShape.holes.push(createRoundedRectPath(27.0, 27.0, 1.2, OLED_X, OLED_Y));
+    const oledBezelGeo = new THREE.ExtrudeGeometry(oledBezelShape, {
+      depth: 3.0,
+      bevelEnabled: true,
+      bevelThickness: 0.8,
+      bevelSize: 0.8,
+      bevelSegments: 2,
+      curveSegments: 16
+    });
+    const oledBezel = new THREE.Mesh(oledBezelGeo, matPodBody);
+    oledBezel.position.z = POD_D / 2 - 0.2;
+    oledBezel.castShadow = true;
+    oledBezel.receiveShadow = true;
+    podBodyGroup.add(oledBezel);
+
+    // Chamfered 5mm RGB Status LED Window Bezel Collar
+    const ledBezelShape = new THREE.Shape();
+    ledBezelShape.absarc(LED_X, LED_Y, 4.8, 0, Math.PI * 2, false);
+    ledBezelShape.holes.push(createCirclePath(LED_X, LED_Y, 2.5));
+    const ledBezel = new THREE.Mesh(
+      new THREE.ExtrudeGeometry(ledBezelShape, {
+        depth: 2.0,
+        bevelEnabled: true,
+        bevelThickness: 0.6,
+        bevelSize: 0.5,
+        bevelSegments: 2,
+        curveSegments: 20
+      }),
+      matPodBody
+    );
+    ledBezel.position.z = POD_D / 2 - 0.2;
+    podBodyGroup.add(ledBezel);
+
+    // Right Wall (+X face, Z: -39.5 to +39.5, Y: 14 to 50) with BMP280 Barometric Breather Slots!
+    const rwW = POD_D - POD_R * 2 + 0.4;
+    const rightShape = new THREE.Shape();
+    rightShape.moveTo(-rwW / 2, MID_Y - 0.1);
+    rightShape.lineTo(rwW / 2, MID_Y - 0.1);
+    rightShape.lineTo(rwW / 2, MID_Y + MID_H + 0.1);
+    rightShape.lineTo(-rwW / 2, MID_Y + MID_H + 0.1);
+    rightShape.closePath();
+
+    // 3 Barometric pressure vent slots into the thermally isolated BMP280 chamber
+    [24, 30, 36].forEach((vy) => {
+      rightShape.holes.push(createSlotPath(0, vy, 16.0, 2.2));
+    });
+
+    const rightWallGeo = new THREE.ExtrudeGeometry(rightShape, {
+      depth: POD_WALL,
+      bevelEnabled: false,
+      curveSegments: 16
+    });
+    rightWallGeo.rotateY(Math.PI / 2); // Shape X -> -Z, Extrusion +Z -> +X
+    const rightWallMesh = new THREE.Mesh(rightWallGeo, matPodBody);
+    rightWallMesh.position.x = POD_W / 2 - POD_WALL;
+    rightWallMesh.castShadow = true;
+    rightWallMesh.receiveShadow = true;
+    podBodyGroup.add(rightWallMesh);
+
+    // 3D. External Hooded/Louvered Weatherproof Vent Baffle on Right Wall (+X = 65 to 73mm)
+    const baffleGroup = new THREE.Group();
+    baffleGroup.position.set(POD_W / 2, 0, 0);
+    // Left/Right side cheeks of the rain hood
+    [-11.5, 11.5].forEach((cz) => {
+      const cheekShape = new THREE.Shape();
+      cheekShape.moveTo(0, 16);
+      cheekShape.lineTo(8.5, 19);
+      cheekShape.lineTo(8.5, 42);
+      cheekShape.lineTo(0, 44);
+      cheekShape.closePath();
+      const cheek = new THREE.Mesh(
+        new THREE.ExtrudeGeometry(cheekShape, { depth: 2.2, bevelEnabled: false }),
+        matPodBody
+      );
+      cheek.position.z = cz - 1.1;
+      cheek.castShadow = true;
+      baffleGroup.add(cheek);
+    });
+    // Top weatherproof rain hood roof
+    const hoodTop = new THREE.Mesh(new THREE.BoxGeometry(9.0, 2.5, 25.2), matPodBody);
+    hoodTop.position.set(4.2, 42.2, 0);
+    hoodTop.rotation.z = -0.18;
+    hoodTop.castShadow = true;
+    baffleGroup.add(hoodTop);
+    // 3 Downward-angled protective louver blades
+    [22, 28, 34].forEach((ly) => {
+      const louver = new THREE.Mesh(new THREE.BoxGeometry(8.0, 1.8, 22.0), matPodBody);
+      louver.position.set(4.4, ly, 0);
+      louver.rotation.z = -0.52;
+      louver.castShadow = true;
+      baffleGroup.add(louver);
+    });
+    podBodyGroup.add(baffleGroup);
+
+    // 3E. 4 Internal Corner M3 Brass-Insert Screw Bosses (X = ±56, Z = ±38.5)
+    const cornerBossCoords = [
+      [-56, -38.5], [56, -38.5], [-56, 38.5], [56, 38.5]
+    ];
+    cornerBossCoords.forEach(([bx, bz]) => {
+      const bShape = new THREE.Shape();
+      bShape.absarc(0, 0, 4.6, 0, Math.PI * 2, false);
+      bShape.holes.push(createCirclePath(0, 0, 2.1)); // M3 heat-set brass insert bore
+      const boss = extrudeXZ(bShape, 54.0, 4.0, matPodBody, 20);
+      boss.position.set(bx, 0, bz);
+      podBodyGroup.add(boss);
+    });
+
+    // 3F. 4 Rugged External Wing-Root / Fuselage Corner Mounting Flanges + Gusset Ribs
+    const flangePositions = [
+      { side: -1, z: -31 },
+      { side: -1, z: 31 },
+      { side: 1, z: -31 },
+      { side: 1, z: 31 }
+    ];
+    flangePositions.forEach(({ side, z }) => {
+      const earW = 18.0;
+      const earD = 20.0;
+      const earShape = createRoundedRectShape(earW, earD, 4.5);
+      // Slotted M5 aircraft panel mounting hole
+      earShape.holes.push(createSlotPath(side * 1.5, 0, 9.5, 5.4));
+      const ear = extrudeXZ(earShape, 6.0, 0, matPodBody, 20);
+      ear.position.set(side * (POD_W / 2 + earW / 2 - 2.0), 0, z);
+      podBodyGroup.add(ear);
+
+      // Triangular vertical structural gusset rib tying flange to enclosure wall
+      const gusShape = new THREE.Shape();
+      gusShape.moveTo(0, 5.8);
+      gusShape.lineTo(side * 13.0, 5.8);
+      gusShape.lineTo(0, 22.0);
+      gusShape.closePath();
+      const gus = new THREE.Mesh(
+        new THREE.ExtrudeGeometry(gusShape, { depth: 3.2, bevelEnabled: false }),
+        matPodBody
+      );
+      gus.position.set(side * (POD_W / 2 - 0.5), 0, z - 1.6);
+      gus.castShadow = true;
+      podBodyGroup.add(gus);
+    });
+
+    // 3G. Bottom M12 Waterproof Cable Entry Bulkhead Boss (Y = 0 down to Y = -14mm)
+    const m12PodPts = [
+      new THREE.Vector2(3.75, 0.5),
+      new THREE.Vector2(9.2, 0.5),
+      new THREE.Vector2(9.2, -5.0),
+      new THREE.Vector2(6.0, -5.0),
+      new THREE.Vector2(6.0, -7.0),
+      new THREE.Vector2(5.45, -7.6),
+      new THREE.Vector2(6.0, -8.2),
+      new THREE.Vector2(5.45, -8.8),
+      new THREE.Vector2(6.0, -9.4),
+      new THREE.Vector2(5.45, -10.0),
+      new THREE.Vector2(6.0, -10.6),
+      new THREE.Vector2(5.45, -11.2),
+      new THREE.Vector2(6.0, -11.8),
+      new THREE.Vector2(5.5, -13.8),
+      new THREE.Vector2(3.75, -13.8),
+      new THREE.Vector2(3.75, 0.5)
+    ];
+    const m12PodBoss = new THREE.Mesh(new THREE.LatheGeometry(m12PodPts, 32), matPodBody);
+    m12PodBoss.position.set(M12_POD_X, 0, M12_POD_Z);
+    m12PodBoss.castShadow = true;
+    podBodyGroup.add(m12PodBoss);
+
+    // Hex shoulder on bottom M12 port
+    const podHex = extrudeXZ(hexShape, 4.8, -5.0, matPodBody, 6);
+    podHex.position.set(M12_POD_X, 0, M12_POD_Z);
+    podBodyGroup.add(podHex);
+
+    // 3H. Internal Standoffs, Lower LiFePO4 Battery Cradle & BMP280 Thermal Isolation Chamber
+    // 1) Thermally Isolated BMP280 Chamber Wall (X = +41mm, Z = -18 to +18mm)
+    const thermalWallMain = new THREE.Mesh(new THREE.BoxGeometry(3.2, 48, 36), matPodBody);
+    thermalWallMain.position.set(41, 28, 0);
+    podBodyGroup.add(thermalWallMain);
+    [-18, 18].forEach((tz) => {
+      const thermalSide = new THREE.Mesh(new THREE.BoxGeometry(20, 48, 3.0), matPodBody);
+      thermalSide.position.set(51, 28, tz);
+      podBodyGroup.add(thermalSide);
+    });
+    // BMP280 Sensor Standoffs inside thermally isolated chamber
+    [[-4, -5], [-4, 5]].forEach(([dx, dz]) => {
+      const sShape = new THREE.Shape();
+      sShape.absarc(0, 0, 2.2, 0, Math.PI * 2, false);
+      sShape.holes.push(createCirclePath(0, 0, 1.0));
+      const st = extrudeXZ(sShape, 18.0, 4.0, matPodBody, 16);
+      st.position.set(52 + dx, 0, dz);
+      podBodyGroup.add(st);
+    });
+
+    // 2) Lower LiFePO4 Battery Pack Cradle / Tray (X = -52 to +22, Z = -39 to -6)
+    const batRails = [
+      { x: -15, z: -5.5, w: 74, d: 2.8, h: 12 },
+      { x: -15, z: -39.5, w: 74, d: 2.8, h: 12 },
+      { x: -53.4, z: -22.5, w: 2.8, d: 34, h: 12 },
+      { x: 23.4, z: -22.5, w: 2.8, d: 34, h: 12 }
+    ];
+    batRails.forEach((r) => {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(r.w, r.h, r.d), matPodBody);
+      rail.position.set(r.x, 4.0 + r.h / 2, r.z);
+      podBodyGroup.add(rail);
+    });
+    // Floor battery cushion ribs
+    for (let rx = -42; rx <= 14; rx += 14) {
+      const rib = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2.0, 30), matPodBody);
+      rib.position.set(rx, 5.0, -22.5);
+      podBodyGroup.add(rib);
+    }
+
+    // 3) ESP32-S3 DevKitC Elevated Standoff Bosses (4× tall 28mm standoffs above battery bay)
+    const espStandoffs = [
+      [-45, -35], [11, -35], [-45, -10], [11, -10]
+    ];
+    espStandoffs.forEach(([sx, sz]) => {
+      const sShape = new THREE.Shape();
+      sShape.absarc(0, 0, 2.8, 0, Math.PI * 2, false);
+      sShape.holes.push(createCirclePath(0, 0, 1.25));
+      const st = extrudeXZ(sShape, 28.0, 4.0, matPodBody, 16);
+      st.position.set(sx, 0, sz);
+      podBodyGroup.add(st);
+    });
+
+    // 4) SX1262 LoRa Module Standoff Bosses (4× 16mm standoffs in front-mid bay)
+    const loraStandoffs = [
+      [-23, 8], [7, 8], [-23, 28], [7, 28]
+    ];
+    loraStandoffs.forEach(([sx, sz]) => {
+      const sShape = new THREE.Shape();
+      sShape.absarc(0, 0, 2.6, 0, Math.PI * 2, false);
+      sShape.holes.push(createCirclePath(0, 0, 1.2));
+      const st = extrudeXZ(sShape, 16.0, 4.0, matPodBody, 16);
+      st.position.set(sx, 0, sz);
+      podBodyGroup.add(st);
+    });
+
+    attachCadEdges(podBodyGroup);
+
+    // --- PRINTABLE PART 4: podSolarLidGroup (15-Degree Angled Solar Lid + SMA Boss) ---
+    const podSolarLidGroup = new THREE.Group();
+    podSolarLidGroup.name = 'TelemetryPodSolarLid';
+    assembly2Root.add(podSolarLidGroup);
+
+    const LID_SLOPE_DEG = 15.0;
+    const LID_SLOPE_RAD = (LID_SLOPE_DEG * Math.PI) / 180;
+    const LID_BASE_Y = 60.0;
+    const LID_FRONT_H = 8.0; // Height at front +Z edge (+47.5mm)
+    // Exact Y of 15° plane as a function of Z: Y(z) = 68 + (47.5 - z) * tan(15°)
+    const lidPlaneY = (z) => LID_BASE_Y + LID_FRONT_H + (POD_D / 2 - z) * Math.tan(LID_SLOPE_RAD);
+
+    // 4A. Underside Perimeter Mating Lip (seats cleanly into the top gasket groove at Y = 58.2 to 60.0)
+    const lidMatingLipShape = createRoundedRectShape(POD_W - 3.2, POD_D - 3.2, POD_R - 1.3);
+    lidMatingLipShape.holes.push(createRoundedRectPath(POD_W - 5.0, POD_D - 5.0, POD_R - 2.0));
+    podSolarLidGroup.add(extrudeXZ(lidMatingLipShape, 2.0, LID_BASE_Y - 1.8, matPodLid, 32));
+
+    // 4B. Hollow 15-Degree Wedge Skirt Walls (exact rounded outer/inner corners sheared onto 15° plane!)
+    const wedgeWallShape = createRoundedRectShape(POD_W, POD_D, POD_R);
+    wedgeWallShape.holes.push(createRoundedRectPath(POD_W - POD_WALL * 2, POD_D - POD_WALL * 2, POD_R - 2.5));
+    const wedgeWallGeo = new THREE.ExtrudeGeometry(wedgeWallShape, {
+      depth: 40.0,
+      bevelEnabled: false,
+      curveSegments: 32
+    });
+    wedgeWallGeo.rotateX(-Math.PI / 2);
+    wedgeWallGeo.translate(0, LID_BASE_Y, 0);
+
+    // Shear all top vertices cleanly onto the exact 15° roof plane!
+    const wPos = wedgeWallGeo.attributes.position;
+    for (let i = 0; i < wPos.count; i++) {
+      if (wPos.getY(i) > LID_BASE_Y + 1.0) {
+        wPos.setY(i, lidPlaneY(wPos.getZ(i)));
+      }
+    }
+    wedgeWallGeo.computeVertexNormals();
+    const wedgeWallMesh = new THREE.Mesh(wedgeWallGeo, matPodLid);
+    wedgeWallMesh.castShadow = true;
+    wedgeWallMesh.receiveShadow = true;
+    podSolarLidGroup.add(wedgeWallMesh);
+
+    // 4C. 4 Internal Corner Screw Bosses inside the Lid (matching Pod Body M3 bosses at ±56, ±38.5)
+    cornerBossCoords.forEach(([bx, bz]) => {
+      const hBoss = lidPlaneY(bz) - LID_BASE_Y;
+      const bShape = new THREE.Shape();
+      bShape.absarc(0, 0, 4.6, 0, Math.PI * 2, false);
+      bShape.holes.push(createCirclePath(0, 0, 1.75)); // M3 clearance hole
+      const boss = extrudeXZ(bShape, hBoss, LID_BASE_Y, matPodLid, 20);
+      boss.position.set(bx, 0, bz);
+      podSolarLidGroup.add(boss);
+    });
+
+    // 4D. 15-Degree Angled Roof Plate with Recessed Mini Solar Panel Pocket & Wire Pass-Through
+    const tiltedRoofGroup = new THREE.Group();
+    const centerRoofY = lidPlaneY(0); // 80.728mm
+    tiltedRoofGroup.position.set(0, centerRoofY, 0);
+    tiltedRoofGroup.rotation.x = LID_SLOPE_RAD; // +Z tilts down, -Z tilts up at exact 15°
+
+    const ROOF_D_SLOPED = POD_D / Math.cos(LID_SLOPE_RAD); // 98.35mm along slope
+    const SOLAR_POCKET_W = 76.0;
+    const SOLAR_POCKET_D = 62.0;
+    const SOLAR_CX = -12.0;
+    const SOLAR_CZ = 4.0;
+
+    // Pocket Floor Layer (thickness 2.0mm, y_local = -2.0 to 0.0) with solar wire hole + 4 corner screw holes
+    const roofFloorShape = createRoundedRectShape(POD_W, ROOF_D_SLOPED, POD_R);
+    // Solar cable pass-through bore (Ø6mm)
+    roofFloorShape.holes.push(createCirclePath(SOLAR_CX, -SOLAR_CZ, 3.0));
+    // 4 corner screw pass-throughs projected onto sloped plane
+    cornerBossCoords.forEach(([bx, bz]) => {
+      roofFloorShape.holes.push(createCirclePath(bx, -(bz / Math.cos(LID_SLOPE_RAD)), 1.8));
+    });
+    tiltedRoofGroup.add(extrudeXZ(roofFloorShape, 2.0, -2.0, matPodLid, 32));
+
+    // Upper Bezel Layer (thickness 3.4mm, y_local = 0.0 to +3.4) with 76x62mm Recessed Solar Pocket Cutout!
+    const roofBezelShape = createRoundedRectShape(POD_W, ROOF_D_SLOPED, POD_R);
+    roofBezelShape.holes.push(createRoundedRectPath(SOLAR_POCKET_W, SOLAR_POCKET_D, 2.5, SOLAR_CX, -SOLAR_CZ));
+    // Counterbore recesses for the 4 corner M3 lid screws
+    cornerBossCoords.forEach(([bx, bz]) => {
+      roofBezelShape.holes.push(createCirclePath(bx, -(bz / Math.cos(LID_SLOPE_RAD)), 3.2));
+    });
+    tiltedRoofGroup.add(extrudeXZ(roofBezelShape, 3.4, 0.0, matPodLid, 32));
+
+    podSolarLidGroup.add(tiltedRoofGroup);
+
+    // 4E. Top-Shoulder Horizontal Landing + Upright Threaded SMA Antenna Boss (Upper Rear-Right Shoulder)
+    const SMA_X = 43.0;
+    const SMA_Z = -25.0;
+    const SMA_PLATFORM_Y = 96.0;
+
+    // Vertical shoulder pedestal bridging smoothly from inside the 15° lid up to horizontal landing
+    const pedShape = createRoundedRectShape(20.0, 20.0, 4.0);
+    pedShape.holes.push(createCirclePath(0, 0, 2.0)); // Coax pass-through bore
+    const pedBaseY = lidPlaneY(SMA_Z) - 5.0;
+    const smaPedestal = extrudeXZ(pedShape, SMA_PLATFORM_Y - pedBaseY, pedBaseY, matPodLid, 20);
+    smaPedestal.position.set(SMA_X, 0, SMA_Z);
+    podSolarLidGroup.add(smaPedestal);
+
+    // Upright Threaded SMA Bulkhead Boss (Y = 96 to 109mm)
+    const smaPts = [
+      new THREE.Vector2(1.9, SMA_PLATFORM_Y - 1.0),
+      new THREE.Vector2(6.2, SMA_PLATFORM_Y - 1.0),
+      new THREE.Vector2(6.2, SMA_PLATFORM_Y + 3.5),
+      new THREE.Vector2(3.3, SMA_PLATFORM_Y + 3.5), // SMA thread OD ~6.35mm (R ~3.2-3.3)
+      new THREE.Vector2(3.3, SMA_PLATFORM_Y + 5.0),
+      new THREE.Vector2(2.9, SMA_PLATFORM_Y + 5.5),
+      new THREE.Vector2(3.3, SMA_PLATFORM_Y + 6.0),
+      new THREE.Vector2(2.9, SMA_PLATFORM_Y + 6.5),
+      new THREE.Vector2(3.3, SMA_PLATFORM_Y + 7.0),
+      new THREE.Vector2(2.9, SMA_PLATFORM_Y + 7.5),
+      new THREE.Vector2(3.3, SMA_PLATFORM_Y + 8.0),
+      new THREE.Vector2(2.9, SMA_PLATFORM_Y + 8.5),
+      new THREE.Vector2(3.3, SMA_PLATFORM_Y + 9.0),
+      new THREE.Vector2(2.9, SMA_PLATFORM_Y + 9.5),
+      new THREE.Vector2(3.3, SMA_PLATFORM_Y + 10.0),
+      new THREE.Vector2(3.0, SMA_PLATFORM_Y + 12.2),
+      new THREE.Vector2(1.9, SMA_PLATFORM_Y + 12.2),
+      new THREE.Vector2(1.9, SMA_PLATFORM_Y - 1.0)
+    ];
+    const smaBoss = new THREE.Mesh(new THREE.LatheGeometry(smaPts, 28), matPodLid);
+    smaBoss.position.set(SMA_X, 0, SMA_Z);
+    smaBoss.castShadow = true;
+    podSolarLidGroup.add(smaBoss);
+
+    attachCadEdges(podSolarLidGroup);
+
+    // --- VISUAL-ONLY GROUPS FOR ASSEMBLY 2 (Excluded from STL Export) ---
+    // 2V-A: Lower LiFePO4 Battery Pack Visual
+    const podBatteryVisual = new THREE.Group();
+    assembly2Root.add(podBatteryVisual);
+
+    const batPack = new THREE.Mesh(new THREE.BoxGeometry(70, 19.5, 30), matBatteryBlue);
+    batPack.position.set(-15, 16.0, -22.5);
+    batPack.castShadow = true;
+    podBatteryVisual.add(batPack);
+    // Yellow Kapton protection tape bands on LiFePO4 pack
+    [-38, 8].forEach((bx) => {
+      const band = new THREE.Mesh(
+        new THREE.BoxGeometry(6, 20.0, 30.6),
+        new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.35 })
+      );
+      band.position.set(bx, 16.0, -22.5);
+      podBatteryVisual.add(band);
+    });
+
+    // 2V-B: Internal Electronics Assembly (ESP32-S3, SX1262 LoRa, BMP280, Front OLED/LED/Buzzer)
+    const podElectronicsGroup = new THREE.Group();
+    assembly2Root.add(podElectronicsGroup);
+
+    // ESP32-S3 DevKitC sitting on 28mm standoffs (Y = 32mm)
+    const espGroup = new THREE.Group();
+    espGroup.position.set(-17, 32.8, -22.5);
+    const espPcb = new THREE.Mesh(new THREE.BoxGeometry(62, 1.6, 28), matPcbDark);
+    espGroup.add(espPcb);
+    // Silver ESP32-S3-WROOM-1 RF shield can
+    const espRf = new THREE.Mesh(new THREE.BoxGeometry(18, 3.2, 16), matSilverRF);
+    espRf.position.set(-18, 2.4, 0);
+    espGroup.add(espRf);
+    // Dual USB-C connectors
+    const usbC = new THREE.Mesh(new THREE.BoxGeometry(7.5, 3.2, 9.0), matStainless);
+    usbC.position.set(28, 2.4, -5.5);
+    espGroup.add(usbC);
+    const usbC2 = new THREE.Mesh(new THREE.BoxGeometry(7.5, 3.2, 9.0), matStainless);
+    usbC2.position.set(28, 2.4, 5.5);
+    espGroup.add(usbC2);
+    // Dual pin header rows
+    [-11.5, 11.5].forEach((hz) => {
+      const hdr = new THREE.Mesh(new THREE.BoxGeometry(50, 5.0, 2.5), matBlackPlastic);
+      hdr.position.set(2, -3.2, hz);
+      espGroup.add(hdr);
+    });
+    podElectronicsGroup.add(espGroup);
+
+    // SX1262 LoRa Transceiver Module sitting on 16mm standoffs (Y = 20mm)
+    const loraGroup = new THREE.Group();
+    loraGroup.position.set(-8, 20.8, 18);
+    const loraPcb = new THREE.Mesh(new THREE.BoxGeometry(34, 1.6, 24), matPcbGreen);
+    loraGroup.add(loraPcb);
+    const loraCan = new THREE.Mesh(new THREE.BoxGeometry(16, 3.0, 14), matSilverRF);
+    loraCan.position.set(-2, 2.3, 0);
+    loraGroup.add(loraCan);
+    // Gold IPEX / U.FL RF connector
+    const ufl = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 1.8, 12), matBrass);
+    ufl.position.set(11, 1.7, -6);
+    loraGroup.add(ufl);
+    podElectronicsGroup.add(loraGroup);
+
+    // BMP280 Barometric Pressure Sensor inside Thermally Isolated Chamber
+    const bmpGroup = new THREE.Group();
+    bmpGroup.position.set(49, 22.8, 0);
+    const bmpPcb = new THREE.Mesh(new THREE.BoxGeometry(11.5, 1.6, 15.0), matPcbPurple);
+    bmpGroup.add(bmpPcb);
+    const bmpSensor = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.1, 2.6), matSilverRF);
+    bmpSensor.position.set(0, 1.35, 0);
+    bmpGroup.add(bmpSensor);
+    podElectronicsGroup.add(bmpGroup);
+
+    // Front Technician-Facing UI Components (mounted right behind +Z cutouts)
+    // 0.96" OLED Module + Glowing C-130 Telemetry Screen
+    const oledScreenMat = new THREE.MeshBasicMaterial({ map: createOledTexture() });
+    const oledPcb = new THREE.Mesh(new THREE.BoxGeometry(28.5, 28.5, 2.0), matPcbBlue);
+    oledPcb.position.set(OLED_X, OLED_Y, POD_D / 2 - 5.2);
+    podElectronicsGroup.add(oledPcb);
+
+    const oledGlass = new THREE.Mesh(new THREE.PlaneGeometry(25.2, 25.2), oledScreenMat);
+    oledGlass.position.set(OLED_X, OLED_Y, POD_D / 2 - 1.2);
+    podElectronicsGroup.add(oledGlass);
+
+    // 5mm Glowing RGB Status LED
+    const rgbLedMat = new THREE.MeshStandardMaterial({
+      color: 0x34d399,
+      emissive: 0x10b981,
+      emissiveIntensity: 2.2,
+      roughness: 0.15
+    });
+    const rgbLed = new THREE.Mesh(new THREE.SphereGeometry(2.4, 20, 16), rgbLedMat);
+    rgbLed.position.set(LED_X, LED_Y, POD_D / 2 - 0.8);
+    podElectronicsGroup.add(rgbLed);
+
+    // Internal Piezo Acoustic Buzzer behind the 3 front vent slots
+    const buzzer = new THREE.Mesh(new THREE.CylinderGeometry(8.5, 8.5, 7.0, 24), matBlackPlastic);
+    buzzer.rotation.x = Math.PI / 2;
+    buzzer.position.set(BUZ_X, 32, POD_D / 2 - 7.8);
+    podElectronicsGroup.add(buzzer);
+
+    // 2V-C: Lid Visuals (Mini Solar Panel seated in 15° Pocket + Upright SMA LoRa Antenna)
+    const podLidVisuals = new THREE.Group();
+    assembly2Root.add(podLidVisuals);
+
+    // Solar Panel sub-group (tilted 15°, moves slightly out of pocket during full explode!)
+    const solarPanelHolder = new THREE.Group();
+    solarPanelHolder.position.set(0, centerRoofY, 0);
+    solarPanelHolder.rotation.x = LID_SLOPE_RAD;
+
+    const solarTex = createSolarPanelTexture();
+    const solarTopMat = new THREE.MeshStandardMaterial({
+      map: solarTex,
+      roughness: 0.18,
+      metalness: 0.35
+    });
+    const solarMaterials = [
+      matBlackPlastic, matBlackPlastic, solarTopMat, matBlackPlastic, matBlackPlastic, matBlackPlastic
+    ];
+    const solarMesh = new THREE.Mesh(new THREE.BoxGeometry(74.0, 2.8, 60.0), solarMaterials);
+    solarMesh.position.set(SOLAR_CX, 1.5, SOLAR_CZ);
+    solarMesh.castShadow = true;
+    solarPanelHolder.add(solarMesh);
+    podLidVisuals.add(solarPanelHolder);
+
+    // Upright Black LoRa SMA Dipole Antenna mounted on the SMA Boss
+    const antennaGroup = new THREE.Group();
+    antennaGroup.position.set(SMA_X, SMA_PLATFORM_Y + 10.5, SMA_Z);
+    // Gold knurled SMA hex nut
+    const smaNut = new THREE.Mesh(new THREE.CylinderGeometry(4.4, 4.4, 6.5, 6), matBrass);
+    smaNut.position.y = 1.0;
+    antennaGroup.add(smaNut);
+    // Articulated hinge collar
+    const antBase = new THREE.Mesh(new THREE.CylinderGeometry(5.2, 4.6, 12, 20), matBlackPlastic);
+    antBase.position.y = 10.0;
+    antennaGroup.add(antBase);
+    // Tapered rubber-ducky dipole whip (88mm tall)
+    const antWhip = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 4.6, 76, 20), matBlackPlastic);
+    antWhip.position.y = 53.0;
+    antWhip.castShadow = true;
+    antennaGroup.add(antWhip);
+    const antCap = new THREE.Mesh(new THREE.SphereGeometry(3.2, 16, 12), matBlackPlastic);
+    antCap.position.y = 91.0;
+    antennaGroup.add(antCap);
+    podLidVisuals.add(antennaGroup);
+
+    // =========================================================================
+    // 7. INTERCONNECTING M12 UMBILICAL HARNESS (Visual-Only, Between Assemblies)
+    // =========================================================================
+    const umbilicalGroup = new THREE.Group();
+    scene.add(umbilicalGroup);
+
+    // M12 Quick-Disconnect Metallic Plug on Assembly 1 Side-Exit Boss
+    const capM12Plug = new THREE.Mesh(new THREE.CylinderGeometry(6.8, 6.8, 12, 20), matSilverRF);
+    capM12Plug.rotation.z = Math.PI / 2;
+    capM12Plug.position.set(-120 + 67.5, 14.5, 0);
+    umbilicalGroup.add(capM12Plug);
+
+    // M12 Quick-Disconnect Metallic Plug on Assembly 2 Bottom Port
+    const podM12Plug = new THREE.Mesh(new THREE.CylinderGeometry(6.8, 6.8, 12, 20), matSilverRF);
+    podM12Plug.position.set(120 + M12_POD_X, -18.0, M12_POD_Z);
+    umbilicalGroup.add(podM12Plug);
+
+    // Smooth Braided M12 Sensor Umbilical Cable Curve
+    const cableCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-120 + 73, 14.5, 0),
+      new THREE.Vector3(-25, 10, 4),
+      new THREE.Vector3(25, -24, 12),
+      new THREE.Vector3(120 + M12_POD_X, -38, M12_POD_Z),
+      new THREE.Vector3(120 + M12_POD_X, -23, M12_POD_Z)
+    ]);
+    const cableMesh = new THREE.Mesh(
+      new THREE.TubeGeometry(cableCurve, 48, 3.0, 12, false),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.72, metalness: 0.15 })
+    );
+    umbilicalGroup.add(cableMesh);
+
+    // Subtle cyan dashed signal flow indicator along umbilical
+    const cableLinePts = cableCurve.getPoints(60);
+    const cableDashGeo = new THREE.BufferGeometry().setFromPoints(cableLinePts);
+    const cableDashMat = new THREE.LineDashedMaterial({
+      color: 0x38bdf8,
+      dashSize: 5,
+      gapSize: 5,
+      transparent: true,
+      opacity: 0.55
+    });
+    const cableDashLine = new THREE.Line(cableDashGeo, cableDashMat);
+    cableDashLine.computeLineDistances();
+    cableDashLine.position.y = 4.5;
+    umbilicalGroup.add(cableDashLine);
+
+    // =========================================================================
+    // 8. 3D PROJECTED ENGINEERING CALLOUT ANNOTATIONS
+    // =========================================================================
+    const calloutLayer = document.getElementById('callout-layer');
+    const calloutDefs = [
+      { id: 'c1', text: '140mm Flange · 12× M5 CSK', color: '#38bdf8', getPos: (t) => new THREE.Vector3(-120 - 58, 7 - 12 * t, 40) },
+      { id: 'c2', text: '38mm Riser · A02YY4W', color: '#22d3ee', getPos: (t) => new THREE.Vector3(-120, 16 + 44 * t, -16) },
+      { id: 'c3', text: 'Dead-Center MPU6050 Pad', color: '#a78bfa', getPos: (t) => new THREE.Vector3(-120, 25 + 48 * t, 0) },
+      { id: 'c4', text: 'DS18B20 Stainless Probe', color: '#e2e8f0', getPos: (t) => new THREE.Vector3(-120 + PROBE_X, -42 + 44 * t, PROBE_Z) },
+      { id: 'c5', text: '22mm Dome · Side M12 Boss', color: '#38bdf8', getPos: (t) => new THREE.Vector3(-120 + 58, 22 + 95 * t, 0) },
+      { id: 'c6', text: 'Cam-Lock Lugs & O-Ring', color: '#f87171', getPos: (t) => new THREE.Vector3(-120 + 52, -16 - 24 * t, 0) },
+      { id: 'c7', text: '15° Solar Lid + SMA LoRa', color: '#fbbf24', getPos: (t) => new THREE.Vector3(120 + 43, 128 + 118 * t, -25) },
+      { id: 'c8', text: '0.96" OLED · RGB · Buzzer', color: '#34d399', getPos: (t) => new THREE.Vector3(120 - 15, 34 - 8 * t, 50) },
+      { id: 'c9', text: 'BMP280 Thermal Baffle', color: '#fb923c', getPos: (t) => new THREE.Vector3(120 + 72, 32 - 8 * t, 0) },
+      { id: 'c10', text: 'ESP32-S3 · SX1262 · LiFePO4', color: '#60a5fa', getPos: (t) => new THREE.Vector3(120 - 15, 38 + 66 * t, -20) }
+    ];
+
+    const calloutElements = calloutDefs.map((def) => {
+      const el = document.createElement('div');
+      el.className = 'callout-label';
+      el.innerHTML = `
+        <div class="px-2 py-0.5 rounded-md bg-slate-950/85 border border-slate-700/90 backdrop-blur-sm shadow-lg whitespace-nowrap text-[10px] font-mono-tech font-medium" style="color:${def.color}">
+          ${def.text}
+        </div>
+        <div class="callout-dot" style="background:${def.color}; color:${def.color}"></div>
+      `;
+      calloutLayer.appendChild(el);
+      return { def, el };
+    });
+
+    let showLabels = true;
+    const projVec = new THREE.Vector3();
+
+    function updateCallouts(t) {
+      if (!showLabels) {
+        calloutLayer.style.display = 'none';
+        return;
+      }
+      calloutLayer.style.display = 'block';
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+
+      for (const { def, el } of calloutElements) {
+        projVec.copy(def.getPos(t)).project(camera);
+        if (projVec.z > 1 || projVec.z < -1) {
+          el.style.opacity = '0';
+          continue;
+        }
+        const x = (projVec.x * 0.5 + 0.5) * w;
+        const y = (-projVec.y * 0.5 + 0.5) * h;
+        // Hide if near screen edges
+        if (x < 20 || x > w - 20 || y < 55 || y > h - 55) {
+          el.style.opacity = '0';
+        } else {
+          el.style.opacity = '0.92';
+          el.style.left = `${x}px`;
+          el.style.top = `${y}px`;
+        }
+      }
+    }
+
+    // =========================================================================
+    // 9. BINARY 1:1 MM STL EXPORTER (Clean Printable Geometry, Slicer Z-Up)
+    // =========================================================================
+    const exporter = new STLExporter();
+    let toastTimer = null;
+
+    function showToast(title, subtitle, isError = false) {
+      const toast = document.getElementById('toast');
+      const dot = document.getElementById('toast-dot');
+      document.getElementById('toast-title').textContent = title;
+      document.getElementById('toast-sub').textContent = subtitle;
+      dot.className = isError
+        ? 'w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_8px_#f43f5e]'
+        : 'w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]';
+      toast.classList.remove('opacity-0', 'translate-y-2');
+      toast.classList.add('opacity-100', 'translate-y-0');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        toast.classList.remove('opacity-100', 'translate-y-0');
+      }, 4200);
+    }
+
+    function exportPrintablePartSTL(sourceGroup, filename) {
+      try {
+        // Clone ONLY printable meshes into an isolated root at origin (0,0,0)
+        const exportRoot = new THREE.Group();
+        const clonedGroup = sourceGroup.clone(true);
+        clonedGroup.position.set(0, 0, 0);
+        clonedGroup.rotation.set(0, 0, 0);
+        clonedGroup.scale.set(1, 1, 1);
+
+        // Strip any CAD wireframe edge overlays before STL export
+        const toRemove = [];
+        clonedGroup.traverse((obj) => {
+          if (obj.userData && obj.userData.isCadEdge) {
+            toRemove.push(obj);
+          }
+        });
+        toRemove.forEach((o) => o.parent && o.parent.remove(o));
+
+        // Convert Three.js Y-up to standard 3D printing slicer Z-up (+90° around X)
+        clonedGroup.rotation.x = Math.PI / 2;
+        exportRoot.add(clonedGroup);
+        exportRoot.updateMatrixWorld(true);
+
+        // Seat part flat on slicer build plate (Z = 0) and centered on X/Y
+        const box = new THREE.Box3().setFromObject(exportRoot);
+        const size = new THREE.Vector3();
+        const center = new THREE.Vector3();
+        box.getSize(size);
+        box.getCenter(center);
+        clonedGroup.position.set(-center.x, -center.y, -box.min.z);
+        exportRoot.updateMatrixWorld(true);
+
+        // Export binary STL at exact 1:1 mm scale
+        const binaryResult = exporter.parse(exportRoot, { binary: true });
+        const blob = new Blob([binaryResult], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+        const kb = (blob.size / 1024).toFixed(1);
+        showToast(
+          `Exported ${filename}`,
+          `${size.x.toFixed(1)} × ${size.y.toFixed(1)} × ${size.z.toFixed(1)} mm · ${kb} KB (Binary STL)`
+        );
+      } catch (err) {
+        console.error('STL Export Error:', err);
+        showToast('STL Export Failed', err.message || 'Check console for details', true);
+      }
+    }
+
+    document.getElementById('btn-export-cap').addEventListener('click', () => {
+      exportPrintablePartSTL(sensorCapGroup, 'INTELLISTIC_C130_Sensor_Cap.stl');
+    });
+    document.getElementById('btn-export-cap-lid').addEventListener('click', () => {
+      exportPrintablePartSTL(capLidGroup, 'INTELLISTIC_C130_Cap_Lid.stl');
+    });
+    document.getElementById('btn-export-pod').addEventListener('click', () => {
+      exportPrintablePartSTL(podBodyGroup, 'INTELLISTIC_C130_Pod_Body.stl');
+    });
+    document.getElementById('btn-export-pod-lid').addEventListener('click', () => {
+      exportPrintablePartSTL(podSolarLidGroup, 'INTELLISTIC_C130_Pod_Solar_Lid.stl');
+    });
+
+    // =========================================================================
+    // 10. EXPLODED VIEW, INSPECTION TOGGLES & CAMERA PRESETS
+    // =========================================================================
+    let targetExplode = 0;
+    let currentExplode = 0;
+
+    const explodeSlider = document.getElementById('explode-slider');
+    const explodeValueEl = document.getElementById('explode-value');
+
+    function setExplodePercent(pct) {
+      const clamped = Math.max(0, Math.min(100, pct));
+      explodeSlider.value = clamped;
+      explodeValueEl.textContent = `${clamped}%`;
+      targetExplode = clamped / 100;
+    }
+
+    explodeSlider.addEventListener('input', (e) => setExplodePercent(Number(e.target.value)));
+    document.getElementById('explode-0').addEventListener('click', () => setExplodePercent(0));
+    document.getElementById('explode-50').addEventListener('click', () => setExplodePercent(50));
+    document.getElementById('explode-100').addEventListener('click', () => setExplodePercent(100));
+
+    function applyExplodedTransforms(t) {
+      // Assembly 1 (Sensor Cap) Vertical Separation
+      sensorCapGroup.position.y = -12 * t;
+      capOringVisual.position.y = -32 * t;
+      capElectronicsGroup.position.y = 46 * t;
+      capLidGroup.position.y = 96 * t;
+      acousticOverlayGroup.position.y = -12 * t;
+
+      // Assembly 2 (Telemetry Pod) Vertical Separation
+      podBodyGroup.position.y = -8 * t;
+      podBatteryVisual.position.y = 26 * t;
+      podElectronicsGroup.position.y = 66 * t;
+      podSolarLidGroup.position.y = 118 * t;
+      podLidVisuals.position.y = 118 * t;
+
+      // Lift mini solar panel subtly out of its 15° recessed pocket so pocket depth is inspectable
+      solarMesh.position.y = 1.5 + 16 * t;
+
+      // Hide interconnecting umbilical smoothly when exploded > 12%
+      umbilicalGroup.visible = t < 0.12;
+    }
+
+    // Inspection Toggles
+    const electronicsCheck = document.getElementById('toggle-electronics');
+    electronicsCheck.addEventListener('change', (e) => {
+      const vis = e.target.checked;
+      capElectronicsGroup.visible = vis;
+      capOringVisual.visible = vis;
+      podBatteryVisual.visible = vis;
+      podElectronicsGroup.visible = vis;
+      podLidVisuals.visible = vis;
+    });
+
+    document.getElementById('toggle-acoustic').addEventListener('change', (e) => {
+      acousticOverlayGroup.visible = e.target.checked;
+    });
+
+    document.getElementById('toggle-xray').addEventListener('change', (e) => {
+      const xray = e.target.checked;
+      printableMaterials.forEach((m) => {
+        m.transparent = xray;
+        m.opacity = xray ? 0.28 : 1.0;
+        m.depthWrite = !xray;
+        m.needsUpdate = true;
+      });
+    });
+
+    document.getElementById('toggle-wireframe').addEventListener('change', (e) => {
+      const showWire = e.target.checked;
+      edgeLinesList.forEach((edge) => {
+        edge.visible = showWire;
+      });
+    });
+
+    document.getElementById('toggle-labels').addEventListener('change', (e) => {
+      showLabels = e.target.checked;
+    });
+
+    // Collapsible Inspector Drawer & Specs Accordion
+    const drawer = document.getElementById('inspector-drawer');
+    const toggleDrawerBtn = document.getElementById('toggle-drawer-btn');
+    let drawerOpen = window.innerWidth >= 768;
+
+    function syncDrawerState() {
+      if (drawerOpen) {
+        drawer.classList.remove('translate-x-[120%]', 'opacity-0', 'pointer-events-none');
+        drawer.classList.add('translate-x-0', 'opacity-100');
+      } else {
+        drawer.classList.add('translate-x-[120%]', 'opacity-0', 'pointer-events-none');
+        drawer.classList.remove('translate-x-0', 'opacity-100');
+      }
+    }
+    syncDrawerState();
+    toggleDrawerBtn.addEventListener('click', () => {
+      drawerOpen = !drawerOpen;
+      syncDrawerState();
+    });
+
+    const specsBody = document.getElementById('specs-body');
+    const specsChevron = document.getElementById('specs-chevron');
+    let specsOpen = true;
+    document.getElementById('toggle-specs-btn').addEventListener('click', () => {
+      specsOpen = !specsOpen;
+      specsBody.classList.toggle('hidden', !specsOpen);
+      specsChevron.style.transform = specsOpen ? 'rotate(0deg)' : 'rotate(-90deg)';
+    });
+
+    // Smooth Camera Presets
+    const cameraPresets = {
+      overview:  { pos: new THREE.Vector3(10, 215, 420), target: new THREE.Vector3(0, 25, 0) },
+      cap:       { pos: new THREE.Vector3(-120, 115, 225), target: new THREE.Vector3(-120, 12, 0) },
+      pod:       { pos: new THREE.Vector3(210, 130, 215), target: new THREE.Vector3(120, 42, 0) },
+      front:     { pos: new THREE.Vector3(120, 42, 235), target: new THREE.Vector3(120, 36, 0) },
+      underside: { pos: new THREE.Vector3(-45, -135, 235), target: new THREE.Vector3(-55, -10, 0) }
+    };
+
+    let camAnim = null;
+    const camButtons = document.querySelectorAll('.cam-btn');
+
+    camButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const key = btn.dataset.cam;
+        const preset = cameraPresets[key];
+        if (!preset) return;
+
+        camButtons.forEach((b) => {
+          b.className = 'cam-btn px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] font-medium whitespace-nowrap transition text-slate-300 hover:bg-slate-800 border border-transparent';
+        });
+        btn.className = 'cam-btn px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] font-medium whitespace-nowrap transition bg-cyan-500/20 text-cyan-200 border border-cyan-500/40';
+
+        camAnim = {
+          startPos: camera.position.clone(),
+          endPos: preset.pos.clone(),
+          startTarget: controls.target.clone(),
+          endTarget: preset.target.clone(),
+          progress: 0
+        };
+      });
+    });
+
+    // Cancel camera auto-transition if user manually interacts
+    controls.addEventListener('start', () => {
+      camAnim = null;
+    });
+
+    // =========================================================================
+    // 11. ANIMATION LOOP & RESPONSIVE RESIZE HANDLER
+    // =========================================================================
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 0.05);
+      const elapsed = clock.getElapsedTime();
+
+      // Smooth Exploded View interpolation
+      if (Math.abs(currentExplode - targetExplode) > 0.0005) {
+        currentExplode += (targetExplode - currentExplode) * Math.min(1, dt * 10);
+        applyExplodedTransforms(currentExplode);
+      }
+
+      // Smooth Camera Preset interpolation
+      if (camAnim) {
+        camAnim.progress = Math.min(1, camAnim.progress + dt * 2.4);
+        const ease = 1 - Math.pow(1 - camAnim.progress, 3);
+        camera.position.lerpVectors(camAnim.startPos, camAnim.endPos, ease);
+        controls.target.lerpVectors(camAnim.startTarget, camAnim.endTarget, ease);
+        if (camAnim.progress >= 1) camAnim = null;
+      }
+
+      // Subtle living aerospace heartbeat on the 5mm RGB Status LED
+      rgbLedMat.emissiveIntensity = 1.6 + Math.sin(elapsed * 3.2) * 0.65;
+
+      controls.update();
+      updateCallouts(currentExplode);
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Start render loop once window is ready
+    window.addEventListener('load', () => {
+      applyExplodedTransforms(0);
+      animate();
+    });
+  </script>
+</body>
+</html>
